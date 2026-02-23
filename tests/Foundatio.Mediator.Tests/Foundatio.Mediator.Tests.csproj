@@ -59,6 +59,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\..\src\Foundatio.Mediator.Abstractions\TopologicalSort.cs"
+      Link="Utility\TopologicalSort.cs" />
     <Compile Remove="SourceGeneratorTestBase.cs" />
     <None Include="SourceGeneratorTestBase.cs" Condition="Exists('SourceGeneratorTestBase.cs')" />
     <None Update="BasicHandlerGenerationTests.GeneratesWrapperForSimpleHandler.verified.txt">

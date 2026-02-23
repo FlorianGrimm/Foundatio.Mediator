@@ -415,6 +415,63 @@ public class LoggingMiddleware
 - `Before`: Lower order values run first
 - `After`/`Finally`: Higher order values run first (reverse order for proper nesting)
 
+### Relative Ordering
+
+Instead of managing numeric order values, you can express ordering relationships between middleware using `OrderBefore` and `OrderAfter`:
+
+```csharp
+// "I must run before LoggingMiddleware"
+[Middleware(OrderBefore = [typeof(LoggingMiddleware)])]
+public class AuthMiddleware
+{
+    public HandlerResult Before(object message)
+    {
+        // Auth check runs before logging
+        return HandlerResult.Continue();
+    }
+}
+
+// "I must run after AuthMiddleware"
+[Middleware(OrderAfter = [typeof(AuthMiddleware)])]
+public class AuditMiddleware
+{
+    public void Before(object message)
+    {
+        // Audit runs after auth
+    }
+}
+
+public class LoggingMiddleware
+{
+    public void Before(object message) { }
+}
+```
+
+The resulting execution order for `Before` is: **AuthMiddleware → LoggingMiddleware → AuditMiddleware**
+
+You can specify multiple types in a single declaration:
+
+```csharp
+// This middleware must run before both Validation and Logging
+[Middleware(OrderBefore = [typeof(ValidationMiddleware), typeof(LoggingMiddleware)])]
+public class SecurityMiddleware
+{
+    public void Before(object message) { }
+}
+```
+
+**How relative ordering works:**
+
+- `OrderBefore = [typeof(X)]` means "I run before X" — adds an edge from this middleware to X
+- `OrderAfter = [typeof(X)]` means "I run after X" — adds an edge from X to this middleware
+- When no relative constraints exist between two middleware, numeric `Order` is used as a tiebreaker
+- Middleware with no constraints and no explicit `Order` uses `int.MaxValue` (runs last)
+- Unknown types in `OrderBefore`/`OrderAfter` are silently ignored (they may not apply to the current handler)
+
+::: warning Circular Dependencies
+If middleware form a circular dependency (e.g., A says OrderBefore B, and B says OrderBefore A), a compiler warning `FMED011` is emitted and the cycle participants fall back to numeric `Order` sorting.
+:::
+
 ## Message-Specific Middleware
 
 Target specific message types or interfaces:

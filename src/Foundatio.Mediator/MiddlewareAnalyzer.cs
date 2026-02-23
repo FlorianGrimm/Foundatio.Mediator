@@ -220,6 +220,10 @@ internal static class MiddlewareAnalyzer
             }
         }
 
+        // Extract OrderBefore and OrderAfter from [Middleware] attribute
+        var orderBefore = ExtractTypeArrayArgument(middlewareAttr, "OrderBefore");
+        var orderAfter = ExtractTypeArrayArgument(middlewareAttr, "OrderAfter");
+
         // Detect constructor parameters (for non-static middleware)
         bool hasConstructorParameters = !isStatic && classSymbol.InstanceConstructors
             .Any(c => c.Parameters.Length > 0);
@@ -238,6 +242,8 @@ internal static class MiddlewareAnalyzer
             ExecuteMethod = executeMethod != null ? CreateMiddlewareMethodInfo(executeMethod, context.SemanticModel.Compilation) : null,
             IsStatic = isStatic,
             Order = order,
+            OrderBefore = new(orderBefore),
+            OrderAfter = new(orderAfter),
             Lifetime = lifetime,
             DeclaredAccessibility = classSymbol.DeclaredAccessibility,
             AssemblyName = classSymbol.ContainingAssembly.Name,
@@ -247,6 +253,28 @@ internal static class MiddlewareAnalyzer
             HasMethodDIParameters = hasMethodDIParameters,
             Diagnostics = new(diagnostics.ToArray()),
         };
+    }
+
+    /// <summary>
+    /// Extracts a Type[] named argument from an attribute, returning the fully qualified type names.
+    /// </summary>
+    private static string[] ExtractTypeArrayArgument(AttributeData? attr, string argumentName)
+    {
+        if (attr == null)
+            return [];
+
+        var arg = attr.NamedArguments.FirstOrDefault(na => na.Key == argumentName);
+        if (arg.Value.Kind != TypedConstantKind.Array || arg.Value.Values.IsDefaultOrEmpty)
+            return [];
+
+        var types = new List<string>();
+        foreach (var typedConstant in arg.Value.Values)
+        {
+            if (typedConstant.Value is INamedTypeSymbol typeSymbol)
+                types.Add(typeSymbol.ToDisplayString());
+        }
+
+        return types.ToArray();
     }
 
     private static MiddlewareMethodInfo CreateMiddlewareMethodInfo(IMethodSymbol method, Compilation compilation)

@@ -29,6 +29,18 @@ public sealed class HandlerAttribute : Attribute
     public int Order { get; set; } = int.MaxValue;
 
     /// <summary>
+    /// Gets or sets the types that this handler must execute before during PublishAsync.
+    /// For example, <c>OrderBefore = [typeof(OtherHandler)]</c> means this handler runs before OtherHandler.
+    /// </summary>
+    public Type[]? OrderBefore { get; set; }
+
+    /// <summary>
+    /// Gets or sets the types that this handler must execute after during PublishAsync.
+    /// For example, <c>OrderAfter = [typeof(OtherHandler)]</c> means this handler runs after OtherHandler.
+    /// </summary>
+    public Type[]? OrderAfter { get; set; }
+
+    /// <summary>
     /// Gets or sets the dependency injection lifetime for this handler.
     /// When set to <see cref="MediatorLifetime.Default"/>, uses the assembly-level
     /// <see cref="MediatorConfigurationAttribute.HandlerLifetime"/> setting.

@@ -204,6 +204,10 @@ internal static class HandlerAnalyzer
                 }
             }
 
+            // Extract OrderBefore and OrderAfter from [Handler] attribute
+            var orderBefore = ExtractTypeArrayArgument(handlerAttr, "OrderBefore");
+            var orderAfter = ExtractTypeArrayArgument(handlerAttr, "OrderAfter");
+
             // Check if the handler has constructor parameters (indicating DI dependencies)
             bool hasConstructorParameters = !handlerMethod.IsStatic &&
                 classSymbol.InstanceConstructors.Any(c => c.Parameters.Length > 0);
@@ -248,6 +252,8 @@ internal static class HandlerAnalyzer
                 HandlerMiddlewareReferences = new(handlerMiddlewareRefs.ToArray()),
                 IsExplicitlyDeclared = methodIsExplicitlyDeclared,
                 Order = order,
+                OrderBefore = new(orderBefore),
+                OrderAfter = new(orderAfter),
                 Lifetime = lifetime,
                 HasConstructorParameters = hasConstructorParameters,
                 Endpoint = endpointInfo,
@@ -370,6 +376,28 @@ internal static class HandlerAnalyzer
     }
 
     #region Endpoint Extraction
+
+    /// <summary>
+    /// Extracts a Type[] named argument from an attribute, returning the fully qualified type names.
+    /// </summary>
+    private static string[] ExtractTypeArrayArgument(AttributeData? attr, string argumentName)
+    {
+        if (attr == null)
+            return [];
+
+        var arg = attr.NamedArguments.FirstOrDefault(na => na.Key == argumentName);
+        if (arg.Value.Kind != TypedConstantKind.Array || arg.Value.Values.IsDefaultOrEmpty)
+            return [];
+
+        var types = new List<string>();
+        foreach (var typedConstant in arg.Value.Values)
+        {
+            if (typedConstant.Value is INamedTypeSymbol typeSymbol)
+                types.Add(typeSymbol.ToDisplayString());
+        }
+
+        return types.ToArray();
+    }
 
     /// <summary>
     /// Extracts the XML documentation summary from a method symbol using syntax trivia.

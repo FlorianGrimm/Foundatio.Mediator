@@ -286,6 +286,7 @@ public class LoggingMiddleware
 | `FMED008` | Error | Synchronous invoke on asynchronous handler |
 | `FMED009` | Error | Synchronous invoke on handler with async middleware |
 | `FMED010` | Error | Synchronous invoke on handler with tuple return |
+| `FMED011` | Warning | Circular ordering dependency detected between middleware or handlers using `OrderBefore`/`OrderAfter`. Falls back to numeric `Order`. |
 
 ## Getting Help
 

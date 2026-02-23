@@ -633,6 +633,56 @@ public class DefaultOrderHandler
   - Constructor argument: `[Handler(5)]`
   - Named property: `[Handler(Order = 5)]`
 
+### Relative Ordering
+
+Instead of managing numeric order values, you can express ordering relationships between handlers using `OrderBefore` and `OrderAfter`:
+
+```csharp
+public record OrderCreated(string OrderId);
+
+// "I must run before NotificationHandler"
+[Handler(OrderBefore = [typeof(NotificationHandler)])]
+public class InventoryHandler
+{
+    public void Handle(OrderCreated evt)
+    {
+        // Update inventory first
+    }
+}
+
+// "I must run after InventoryHandler"
+[Handler(OrderAfter = [typeof(InventoryHandler)])]
+public class NotificationHandler
+{
+    public void Handle(OrderCreated evt)
+    {
+        // Send notification after inventory is updated
+    }
+}
+```
+
+You can specify multiple types:
+
+```csharp
+// This handler must run after both Validation and Inventory handlers
+[Handler(OrderAfter = [typeof(ValidationHandler), typeof(InventoryHandler)])]
+public class AuditHandler
+{
+    public void Handle(OrderCreated evt) { }
+}
+```
+
+**How relative ordering works:**
+
+- `OrderBefore = [typeof(X)]` means "I run before X"
+- `OrderAfter = [typeof(X)]` means "I run after X"
+- When no relative constraints exist between two handlers, numeric `Order` is used as a tiebreaker
+- Unknown types in `OrderBefore`/`OrderAfter` are silently ignored
+
+::: warning Circular Dependencies
+If handlers form a circular dependency (e.g., A says OrderBefore B, and B says OrderBefore A), a compiler warning `FMED011` is emitted and the cycle participants fall back to numeric `Order` sorting.
+:::
+
 ### Use Cases
 
 Handler ordering is useful for scenarios like:

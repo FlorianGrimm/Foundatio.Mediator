@@ -213,12 +213,12 @@ public sealed class MediatorGenerator : IIncrementalGenerator
         foreach (var handler in filteredHandlers)
         {
             callSitesByMessage.TryGetValue(handler.MessageType, out var handlerCallSites);
-            var applicableMiddleware = GetApplicableMiddlewares(allMiddleware.ToImmutableArray(), handler, compilation, configuration);
+            var applicableMiddleware = GetApplicableMiddlewares(allMiddleware.ToImmutableArray(), handler, compilation, configuration, out var orderingDiagnostics);
 
             // Resolve effective handler lifetime: use explicit lifetime if set, otherwise use project default
             var resolvedHandlerLifetime = ResolveEffectiveLifetime(handler.Lifetime, configuration.DefaultHandlerLifetime);
 
-            handlersWithInfo.Add(handler with { CallSites = new(handlerCallSites), Middleware = applicableMiddleware, Lifetime = resolvedHandlerLifetime });
+            handlersWithInfo.Add(handler with { CallSites = new(handlerCallSites), Middleware = applicableMiddleware, Lifetime = resolvedHandlerLifetime, OrderingDiagnostics = new(orderingDiagnostics.ToArray()) });
         }
 
         // Collect call sites that need cross-assembly interceptors
@@ -306,8 +306,9 @@ public sealed class MediatorGenerator : IIncrementalGenerator
             sw.ElapsedMilliseconds);
     }
 
-    private static EquatableArray<MiddlewareInfo> GetApplicableMiddlewares(ImmutableArray<MiddlewareInfo> middlewares, HandlerInfo handler, Compilation compilation, GeneratorConfiguration configuration)
+    private static EquatableArray<MiddlewareInfo> GetApplicableMiddlewares(ImmutableArray<MiddlewareInfo> middlewares, HandlerInfo handler, Compilation compilation, GeneratorConfiguration configuration, out List<DiagnosticInfo> orderingDiagnostics)
     {
+        orderingDiagnostics = [];
         var applicable = new List<MiddlewareInfo>();
         var addedMiddlewareTypes = new HashSet<string>();
 
@@ -359,10 +360,33 @@ public sealed class MediatorGenerator : IIncrementalGenerator
             }
         }
 
-        return new EquatableArray<MiddlewareInfo>(applicable
-            .OrderBy(m => m.Order ?? int.MaxValue) // Middleware without order goes last
-            .ThenBy(m => m.MessageType.IsObject ? 2 : (m.MessageType.IsInterface ? 1 : 0)) // Priority: specific=0, interface=1, object=2
-            .ToArray());
+        // Use topological sort to respect OrderBefore/OrderAfter constraints with numeric Order as tiebreaker
+        List<DiagnosticInfo> cycleDiagnostics;
+        var sorted = MiddlewareOrderingSorter.Sort(
+            applicable,
+            m => m.FullName,
+            m => (IEnumerable<string>)m.OrderBefore,
+            m => (IEnumerable<string>)m.OrderAfter,
+            m => m.Order ?? int.MaxValue,
+            out cycleDiagnostics);
+
+        // If there were no relative ordering constraints, apply the original secondary sort (message type specificity)
+        // For items at the same numeric order level, prefer specific types over interfaces over object
+        if (!applicable.Any(m => m.OrderBefore.Any() || m.OrderAfter.Any()))
+        {
+            sorted = sorted
+                .OrderBy(m => m.Order ?? int.MaxValue)
+                .ThenBy(m => m.MessageType.IsObject ? 2 : (m.MessageType.IsInterface ? 1 : 0))
+                .ToList();
+        }
+
+        // Propagate cycle diagnostics to the caller for reporting
+        if (cycleDiagnostics.Count > 0)
+        {
+            orderingDiagnostics.AddRange(cycleDiagnostics);
+        }
+
+        return new EquatableArray<MiddlewareInfo>(sorted.ToArray());
     }
 
     private static bool IsMiddlewareApplicableToHandler(MiddlewareInfo middleware, HandlerInfo handler)

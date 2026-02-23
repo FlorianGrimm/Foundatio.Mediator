@@ -15,7 +15,9 @@ public class HandlerRegistration
     /// <param name="isAsync">Whether the handler supports async operations</param>
     /// <param name="order">The execution order for this handler during PublishAsync. Lower values execute first.</param>
     /// <param name="publishAsync">The delegate for publish scenarios (discards return value, avoids allocation)</param>
-    public HandlerRegistration(string messageTypeName, string handlerClassName, HandleAsyncDelegate handleAsync, HandleDelegate? handle, bool isAsync, int order = int.MaxValue, PublishAsyncDelegate? publishAsync = null)
+    /// <param name="orderBefore">Fully qualified type names of handlers that this handler must execute before.</param>
+    /// <param name="orderAfter">Fully qualified type names of handlers that this handler must execute after.</param>
+    public HandlerRegistration(string messageTypeName, string handlerClassName, HandleAsyncDelegate handleAsync, HandleDelegate? handle, bool isAsync, int order = int.MaxValue, PublishAsyncDelegate? publishAsync = null, string[]? orderBefore = null, string[]? orderAfter = null)
     {
         MessageTypeName = messageTypeName;
         HandlerClassName = handlerClassName;
@@ -23,6 +25,8 @@ public class HandlerRegistration
         Handle = handle;
         IsAsync = isAsync;
         Order = order;
+        OrderBefore = orderBefore ?? [];
+        OrderAfter = orderAfter ?? [];
         // If no publish delegate provided, create a wrapper that discards the result
         PublishAsync = publishAsync ?? CreatePublishDelegate(handleAsync);
     }
@@ -78,6 +82,16 @@ public class HandlerRegistration
     /// Lower values execute first. Default is int.MaxValue.
     /// </summary>
     public int Order { get; }
+
+    /// <summary>
+    /// Fully qualified type names of handlers that this handler must execute before during PublishAsync.
+    /// </summary>
+    public string[] OrderBefore { get; }
+
+    /// <summary>
+    /// Fully qualified type names of handlers that this handler must execute after during PublishAsync.
+    /// </summary>
+    public string[] OrderAfter { get; }
 }
 
 public delegate ValueTask<object?> HandleAsyncDelegate(IMediator mediator, object message, CancellationToken cancellationToken, Type? returnType);

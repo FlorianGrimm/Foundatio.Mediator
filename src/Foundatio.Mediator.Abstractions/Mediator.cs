@@ -253,9 +253,12 @@ public class Mediator : IMediator, IServiceProvider
             currentType = currentType.BaseType;
         }
 
-        var handlers = allHandlers
-            .Distinct()
-            .OrderBy(h => h.Order)
+        var handlers = TopologicalSort.Sort(
+                allHandlers.Distinct().ToList(),
+                h => h.HandlerClassName,
+                h => h.OrderBefore,
+                h => h.OrderAfter,
+                h => h.Order)
             .Select(h => h.PublishAsync)
             .ToArray();
 
@@ -367,9 +370,12 @@ public class Mediator : IMediator, IServiceProvider
             }
         }
 
-        var handlers = allHandlers
-            .Distinct()
-            .OrderBy(h => h.Order)
+        var handlers = TopologicalSort.Sort(
+                allHandlers.Distinct().ToList(),
+                h => h.HandlerClassName,
+                h => h.OrderBefore,
+                h => h.OrderAfter,
+                h => h.Order)
             .Select(h => h.PublishAsync)
             .ToArray();
 

@@ -18,7 +18,7 @@ namespace Common.Module.Middleware;
 ///    build a one-off policy from the attribute values.
 /// When <c>PolicyName</c> is set it takes priority and all other attribute properties are ignored.
 /// </summary>
-[Middleware(Order = 0, ExplicitOnly = true)] // Low order = outermost wrapper, ExplicitOnly = only via [Retry]
+[Middleware(Order = 0, ExplicitOnly = true, OrderBefore = [typeof(CachingMiddleware)])] // Outermost wrapper, runs before caching so retried results can still be cached
 public static class RetryMiddleware
 {
     // Default policy for handlers without custom settings and no named policy

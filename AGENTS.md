@@ -194,6 +194,18 @@ Middleware classes must end with `Middleware`. Available hook methods:
 
 **State passing:** Return value from `Before` is passed as a parameter to `After`/`Finally` with matching type.
 
+**Relative ordering:** Use `OrderBefore`/`OrderAfter` to express relationships between middleware instead of numeric values:
+
+```csharp
+[Middleware(OrderBefore = [typeof(LoggingMiddleware)])]
+public class AuthMiddleware { /* runs before LoggingMiddleware */ }
+
+[Middleware(OrderAfter = [typeof(AuthMiddleware)])]
+public class AuditMiddleware { /* runs after AuthMiddleware */ }
+```
+
+Circular dependencies emit warning `FMED011` and fall back to numeric `Order`.
+
 ```csharp
 [Middleware(Order = 10)]  // Lower Order = runs earlier in Before
 public class TimingMiddleware

@@ -19,6 +19,11 @@ internal readonly record struct HandlerInfo
     public EquatableArray<MiddlewareInfo> Middleware { get; init; }
 
     /// <summary>
+    /// Diagnostics related to ordering (e.g., circular dependency warnings).
+    /// </summary>
+    public EquatableArray<DiagnosticInfo> OrderingDiagnostics { get; init; }
+
+    /// <summary>
     /// Middleware explicitly specified on this handler via [UseMiddleware] or custom attributes
     /// implementing IHandlerMiddlewareAttribute.
     /// </summary>
@@ -41,6 +46,16 @@ internal readonly record struct HandlerInfo
     /// Lower values execute first. Default is int.MaxValue.
     /// </summary>
     public int Order { get; init; }
+
+    /// <summary>
+    /// Fully qualified type names of handlers that this handler must execute before during PublishAsync.
+    /// </summary>
+    public EquatableArray<string> OrderBefore { get; init; }
+
+    /// <summary>
+    /// Fully qualified type names of handlers that this handler must execute after during PublishAsync.
+    /// </summary>
+    public EquatableArray<string> OrderAfter { get; init; }
 
     /// <summary>
     /// The dependency injection lifetime for this handler.

@@ -14,6 +14,17 @@ internal readonly record struct MiddlewareInfo
     public bool IsStatic { get; init; }
     public bool IsAsync => BeforeMethod?.IsAsync == true || AfterMethod?.IsAsync == true || FinallyMethod?.IsAsync == true || ExecuteMethod?.IsAsync == true;
     public int? Order { get; init; }
+
+    /// <summary>
+    /// Fully qualified type names of middleware that this middleware must run before.
+    /// </summary>
+    public EquatableArray<string> OrderBefore { get; init; }
+
+    /// <summary>
+    /// Fully qualified type names of middleware that this middleware must run after.
+    /// </summary>
+    public EquatableArray<string> OrderAfter { get; init; }
+
     public Accessibility DeclaredAccessibility { get; init; }
     public string AssemblyName { get; init; }
     public EquatableArray<DiagnosticInfo> Diagnostics { get; init; }

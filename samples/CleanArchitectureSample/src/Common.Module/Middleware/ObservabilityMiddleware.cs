@@ -14,7 +14,7 @@ namespace Common.Module.Middleware;
 /// - Provides consistent, correlated logging
 /// - Simplifies the middleware pipeline
 /// </summary>
-[Middleware(Order = 1)]
+[Middleware(OrderBefore = [typeof(ValidationMiddleware)])]
 public class ObservabilityMiddleware
 {
     private const long SlowHandlerThresholdMs = 100;

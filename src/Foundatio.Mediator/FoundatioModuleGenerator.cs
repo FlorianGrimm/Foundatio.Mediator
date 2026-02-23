@@ -141,7 +141,19 @@ internal static class FoundatioModuleGenerator
                         }
 
                         source.AppendLine($"        {handler.IsAsync.ToString().ToLower()},");
-                        source.AppendLine($"        {handler.Order}));");
+
+                        // Emit order and ordering constraints
+                        var hasOrderConstraints = handler.OrderBefore.Any() || handler.OrderAfter.Any();
+                        if (hasOrderConstraints)
+                        {
+                            source.AppendLine($"        {handler.Order},");
+                            source.AppendLine($"        orderBefore: {FormatStringArray(handler.OrderBefore)},");
+                            source.AppendLine($"        orderAfter: {FormatStringArray(handler.OrderAfter)}));");
+                        }
+                        else
+                        {
+                            source.AppendLine($"        {handler.Order}));");
+                        }
                         source.AppendLine();
                     }
                 }
@@ -173,5 +185,15 @@ internal static class FoundatioModuleGenerator
             return "TryAddSingleton";
         // None or unknown - default to Singleton for performance
         return "TryAddSingleton";
+    }
+
+    private static string FormatStringArray(IEnumerable<string> items)
+    {
+        var values = items.ToList();
+        if (values.Count == 0)
+            return "null";
+
+        var escaped = string.Join(", ", values.Select(v => $"\"{v}\""));
+        return $"new[] {{ {escaped} }}";
     }
 }

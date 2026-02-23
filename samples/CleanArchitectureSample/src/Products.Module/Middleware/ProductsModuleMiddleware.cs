@@ -1,9 +1,11 @@
 using Foundatio.Mediator;
 using Microsoft.Extensions.Logging;
 
+using Common.Module.Middleware;
+
 namespace Products.Module.Middleware;
 
-[Middleware(Order = 3)]
+[Middleware(OrderAfter = [typeof(ValidationMiddleware)])]
 public static class ProductsModuleMiddleware
 {
     public static void Before(object message, ILogger<IMediator> logger)

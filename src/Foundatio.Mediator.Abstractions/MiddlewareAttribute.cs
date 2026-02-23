@@ -29,6 +29,18 @@ public sealed class MiddlewareAttribute : Attribute
     public int Order { get; set; }
 
     /// <summary>
+    /// Gets or sets the types that this middleware must execute before.
+    /// For example, <c>OrderBefore = [typeof(OtherMiddleware)]</c> means this middleware runs before OtherMiddleware.
+    /// </summary>
+    public Type[]? OrderBefore { get; set; }
+
+    /// <summary>
+    /// Gets or sets the types that this middleware must execute after.
+    /// For example, <c>OrderAfter = [typeof(OtherMiddleware)]</c> means this middleware runs after OtherMiddleware.
+    /// </summary>
+    public Type[]? OrderAfter { get; set; }
+
+    /// <summary>
     /// Gets or sets the dependency injection lifetime for this middleware.
     /// When set to <see cref="MediatorLifetime.Default"/>, uses the assembly-level
     /// <see cref="MediatorConfigurationAttribute.MiddlewareLifetime"/> setting.

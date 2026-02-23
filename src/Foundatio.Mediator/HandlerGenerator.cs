@@ -338,8 +338,9 @@ internal static class HandlerGenerator
         var variables = new Dictionary<string, string> { ["System.IServiceProvider"] = "serviceProvider" };
 
         // Build middleware lists - separate Execute middleware from Before/After/Finally
+        // The handler.Middleware array is already sorted by topological sort (respecting OrderBefore/OrderAfter + numeric Order)
         var executeMiddleware = handler.HasExecuteMiddleware
-            ? handler.Middleware.Where(m => m.ExecuteMethod != null).OrderBy(m => m.Order ?? 0).ToList()
+            ? handler.Middleware.Where(m => m.ExecuteMethod != null).ToList()
             : [];
         var beforeMiddleware = handler.HasBeforeMiddleware
             ? handler.Middleware.Where(m => m.BeforeMethod != null).Select(m => (Method: m.BeforeMethod!.Value, Middleware: m)).ToList()
@@ -1407,6 +1408,12 @@ internal static class HandlerGenerator
                 {
                     context.ReportDiagnostic(diagnostic.ToDiagnostic());
                 }
+            }
+
+            // Report ordering diagnostics (e.g., circular dependency warnings)
+            foreach (var diagnostic in handler.OrderingDiagnostics)
+            {
+                context.ReportDiagnostic(diagnostic.ToDiagnostic());
             }
         }
 

@@ -130,6 +130,8 @@ internal static class MetadataMiddlewareScanner
 
             // Get the order from the [Middleware] attribute
             int order = 0;
+            string[] orderBefore = [];
+            string[] orderAfter = [];
             var middlewareAttr = classSymbol.GetAttributes()
                 .FirstOrDefault(attr => SymbolEqualityComparer.Default.Equals(attr.AttributeClass, _middlewareAttribute));
 
@@ -147,6 +149,10 @@ internal static class MetadataMiddlewareScanner
                     if (orderArg.Value.Value is int namedOrder)
                         order = namedOrder;
                 }
+
+                // Extract OrderBefore and OrderAfter
+                orderBefore = ExtractTypeArrayArgument(middlewareAttr, "OrderBefore");
+                orderAfter = ExtractTypeArrayArgument(middlewareAttr, "OrderAfter");
             }
 
             // Determine message type from first method found
@@ -177,6 +183,8 @@ internal static class MetadataMiddlewareScanner
                 MessageType = messageType,
                 IsStatic = isStatic,
                 Order = order,
+                OrderBefore = new(orderBefore),
+                OrderAfter = new(orderAfter),
                 BeforeMethod = beforeMethod != null ? CreateMiddlewareMethodInfo(beforeMethod) : null,
                 AfterMethod = afterMethod != null ? CreateMiddlewareMethodInfo(afterMethod) : null,
                 FinallyMethod = finallyMethod != null ? CreateMiddlewareMethodInfo(finallyMethod) : null,
@@ -187,6 +195,25 @@ internal static class MetadataMiddlewareScanner
                 HasMethodDIParameters = hasMethodDIParameters,
                 Diagnostics = new EquatableArray<DiagnosticInfo>([]) // No diagnostics for metadata-based
             };
+        }
+
+        /// <summary>
+        /// Extracts a Type[] named argument from an attribute, returning the fully qualified type names.
+        /// </summary>
+        private static string[] ExtractTypeArrayArgument(AttributeData attr, string argumentName)
+        {
+            var arg = attr.NamedArguments.FirstOrDefault(na => na.Key == argumentName);
+            if (arg.Value.Kind != TypedConstantKind.Array || arg.Value.Values.IsDefaultOrEmpty)
+                return [];
+
+            var types = new List<string>();
+            foreach (var typedConstant in arg.Value.Values)
+            {
+                if (typedConstant.Value is INamedTypeSymbol typeSymbol)
+                    types.Add(typeSymbol.ToDisplayString());
+            }
+
+            return types.ToArray();
         }
 
         private MiddlewareMethodInfo CreateMiddlewareMethodInfo(IMethodSymbol method)
