@@ -35,3 +35,19 @@ public record DeleteProduct([Required] string ProductId) : ICommand<Result>;
 public record GetProduct([Required] string ProductId) : IQuery<Result<Product>>;
 
 public record GetProducts() : IQuery<Result<List<Product>>>;
+
+/// <summary>
+/// Returns an aggregated product catalog summary.
+/// The handler simulates an expensive computation (500ms delay) that is cached.
+/// First call is slow; subsequent calls return instantly from cache.
+/// </summary>
+public record GetProductCatalog() : IQuery<Result<ProductCatalogSummary>>;
+
+/// <summary>
+/// Aggregated catalog statistics returned by <see cref="GetProductCatalog"/>.
+/// </summary>
+public record ProductCatalogSummary(
+    int TotalProducts,
+    int ActiveProducts,
+    decimal AveragePrice,
+    DateTime GeneratedAt);

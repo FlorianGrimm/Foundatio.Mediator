@@ -4,7 +4,7 @@ using Foundatio.Mediator;
 using Foundatio.Resilience;
 using Microsoft.Extensions.Logging;
 
-namespace ConsoleSample.Middleware;
+namespace Common.Module.Middleware;
 
 /// <summary>
 /// Middleware that wraps the entire pipeline (Before → Handler → After → Finally) with retry logic.

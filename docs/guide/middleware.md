@@ -274,7 +274,22 @@ public class OrderHandler
 - Use `HandlerExecutionInfo` to access handler type and method for reflection
 - Cache policies per handler to avoid rebuilding on each invocation
 
-> **Complete Example**: See the [ConsoleSample RetryMiddleware](https://github.com/FoundatioFx/Foundatio.Mediator/blob/main/samples/ConsoleSample/Middleware/RetryMiddleware.cs) and [RetryAttribute](https://github.com/FoundatioFx/Foundatio.Mediator/blob/main/samples/ConsoleSample/RetryAttribute.cs) for working implementations.
+> **Complete Example**: See the [Clean Architecture Sample RetryMiddleware](https://github.com/FoundatioFx/Foundatio.Mediator/blob/main/samples/CleanArchitectureSample/src/Common.Module/Middleware/RetryMiddleware.cs), [RetryAttribute](https://github.com/FoundatioFx/Foundatio.Mediator/blob/main/samples/CleanArchitectureSample/src/Common.Module/Middleware/RetryAttribute.cs), and [PaymentHandler](https://github.com/FoundatioFx/Foundatio.Mediator/blob/main/samples/CleanArchitectureSample/src/Orders.Module/Handlers/PaymentHandler.cs) (which randomly throws transient errors to demonstrate retry behavior).
+
+### Caching Middleware
+
+The same `[UseMiddleware]` + `ExplicitOnly` pattern works for caching. A `[Cached]` attribute triggers a `CachingMiddleware` that memoizes handler results keyed by message value (C# records have value equality, so identical queries are automatic cache hits).
+
+```csharp
+[Cached(DurationSeconds = 60)]
+public async Task<Result<ProductCatalogSummary>> HandleAsync(GetProductCatalog query, ...)
+{
+    await Task.Delay(500, cancellationToken); // Simulate expensive aggregation
+    // First call is slow; subsequent calls return instantly from cache
+}
+```
+
+> **Complete Example**: See the [CachingMiddleware](https://github.com/FoundatioFx/Foundatio.Mediator/blob/main/samples/CleanArchitectureSample/src/Common.Module/Middleware/CachingMiddleware.cs), [CachedAttribute](https://github.com/FoundatioFx/Foundatio.Mediator/blob/main/samples/CleanArchitectureSample/src/Common.Module/Middleware/CachedAttribute.cs), and [ProductHandler](https://github.com/FoundatioFx/Foundatio.Mediator/blob/main/samples/CleanArchitectureSample/src/Products.Module/Handlers/ProductHandler.cs) in the Clean Architecture Sample.
 
 ## Short-Circuiting with HandlerResult
 
@@ -530,106 +545,6 @@ public class LoggingMiddleware
     }
 }
 ```
-
-### Caching Middleware
-
-Here's a caching middleware that uses the `[Cached]` attribute pattern. The middleware:
-
-- Uses `ExplicitOnly = true` so it only applies to handlers with `[Cached]`
-- Uses the message as the cache key (records have value equality)
-- Supports configurable expiration
-
-```csharp
-/// <summary>
-/// Custom attribute that triggers CachingMiddleware and configures cache settings.
-/// </summary>
-[UseMiddleware(typeof(CachingMiddleware))]
-[AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = true)]
-public sealed class CachedAttribute : Attribute
-{
-    public int DurationSeconds { get; set; } = 300;
-    public bool SlidingExpiration { get; set; }
-}
-```
-
-```csharp
-/// <summary>
-/// Middleware that caches handler responses.
-/// Only applies to handlers with [Cached] attribute (ExplicitOnly = true).
-/// Uses the message as cache key - record types work automatically (value equality).
-/// </summary>
-[Middleware(Order = 100, ExplicitOnly = true)] // High order = runs close to handler
-public static class CachingMiddleware
-{
-    private static readonly ConcurrentDictionary<object, CacheEntry> Cache = new();
-    private static readonly ConcurrentDictionary<MethodInfo, CacheSettings> SettingsCache = new();
-
-    public static async ValueTask<object?> ExecuteAsync(
-        object message,
-        HandlerExecutionDelegate next,
-        HandlerExecutionInfo handlerInfo,
-        ILogger<IMediator> logger)
-    {
-        var settings = SettingsCache.GetOrAdd(handlerInfo.HandlerMethod, method =>
-        {
-            var attr = method.GetCustomAttribute<CachedAttribute>();
-            return new CacheSettings
-            {
-                Duration = TimeSpan.FromSeconds(attr?.DurationSeconds ?? 300),
-                SlidingExpiration = attr?.SlidingExpiration ?? false
-            };
-        });
-
-        // Check cache - message is the key (records have value equality)
-        if (Cache.TryGetValue(message, out var entry) && !entry.IsExpired)
-        {
-            logger.LogDebug("CachingMiddleware: Cache HIT for {MessageType}", message.GetType().Name);
-            if (settings.SlidingExpiration)
-                entry.LastAccessed = DateTime.UtcNow;
-            return entry.Value;
-        }
-
-        // Cache miss - execute handler
-        logger.LogDebug("CachingMiddleware: Cache MISS for {MessageType}", message.GetType().Name);
-        var result = await next();
-
-        // Store in cache
-        Cache[message] = new CacheEntry { Value = result, Duration = settings.Duration, /* ... */ };
-        return result;
-    }
-
-    /// <summary>
-    /// Invalidates the cache entry for a specific message.
-    /// </summary>
-    public static void Invalidate(object message) => Cache.TryRemove(message, out _);
-}
-```
-
-Usage:
-
-```csharp
-public class OrderHandler
-{
-    [Cached(DurationSeconds = 60)]
-    public Result<Order> Handle(GetOrder query)
-    {
-        // Only executes on cache miss
-        return _repository.GetOrder(query.OrderId);
-    }
-
-    public async Task<Result<Order>> HandleAsync(UpdateOrder command)
-    {
-        var result = await _repository.UpdateOrder(command);
-
-        // Invalidate cache when data changes
-        CachingMiddleware.Invalidate(new GetOrder(command.OrderId));
-
-        return result;
-    }
-}
-```
-
-> **Complete Example**: See the [ConsoleSample CachingMiddleware](https://github.com/FoundatioFx/Foundatio.Mediator/blob/main/samples/ConsoleSample/Middleware/CachingMiddleware.cs) and [CachedAttribute](https://github.com/FoundatioFx/Foundatio.Mediator/blob/main/samples/ConsoleSample/CachedAttribute.cs) for working implementations.
 
 ## Async Middleware
 

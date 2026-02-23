@@ -42,3 +42,11 @@ public record DeleteOrder([Required] string OrderId) : ICommand<Result>;
 public record GetOrder([Required] string OrderId) : IQuery<Result<Order>>;
 
 public record GetOrders() : IQuery<Result<List<Order>>>;
+
+/// <summary>
+/// Simulates processing a payment for an order.
+/// The handler randomly throws transient errors to demonstrate retry middleware.
+/// </summary>
+public record ProcessPayment(
+    [Required] string OrderId,
+    [Required] [Range(0.01, 1000000)] decimal Amount) : ICommand<Result<string>>;

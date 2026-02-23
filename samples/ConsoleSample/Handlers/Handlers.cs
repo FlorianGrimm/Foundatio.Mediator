@@ -32,7 +32,6 @@ public class OrderHandler
         _logger = logger;
     }
 
-    [Retry(MaxAttempts = 3, DelayMs = 100)]
     public async Task<(Result<Order> Order, OrderCreated? Event)> HandleAsync(CreateOrder command, IDbTransaction transaction)
     {
         var tx = (FakeTransaction)transaction;
@@ -62,7 +61,6 @@ public class OrderHandler
         return order; // Implicit conversion to Result<Order>
     }
 
-    [Retry(PolicyName = "aggressive")]
     public async Task<(Result<Order> Order, OrderUpdated? Event)> HandleAsync(UpdateOrder command)
     {
         _logger.LogInformation("Updating order {OrderId}", command.OrderId);

@@ -1,5 +1,6 @@
 using Common.Module;
 using Common.Module.Events;
+using Common.Module.Middleware;
 using Foundatio.Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Logging;
@@ -18,8 +19,9 @@ namespace Products.Module.Handlers;
 public class ProductHandler(IProductRepository repository)
 {
     /// <summary>
-    /// Creates a new product
+    /// Creates a new product (retries with custom inline settings)
     /// </summary>
+    [Retry(MaxAttempts = 5, DelayMs = 200)]
     public async Task<(Result<Product>, ProductCreated?)> HandleAsync(CreateProduct command, CancellationToken cancellationToken)
     {
         var product = new Product(
@@ -39,9 +41,10 @@ public class ProductHandler(IProductRepository repository)
     }
 
     /// <summary>
-    /// Gets a product by ID (anonymous - public catalog)
+    /// Gets a product by ID (anonymous - public catalog, cached 30s)
     /// </summary>
     [AllowAnonymous]
+    [Cached(DurationSeconds = 30)]
     public async Task<Result<Product>> HandleAsync(GetProduct query, CancellationToken cancellationToken)
     {
         var product = await repository.GetByIdAsync(query.ProductId, cancellationToken);
@@ -53,9 +56,10 @@ public class ProductHandler(IProductRepository repository)
     }
 
     /// <summary>
-    /// Gets all products (anonymous - public catalog)
+    /// Gets all products (anonymous - public catalog, cached 30s)
     /// </summary>
     [AllowAnonymous]
+    [Cached(DurationSeconds = 30)]
     public async Task<Result<List<Product>>> HandleAsync(GetProducts query, CancellationToken cancellationToken)
     {
         var products = await repository.GetAllAsync(cancellationToken);
@@ -107,6 +111,29 @@ public class ProductHandler(IProductRepository repository)
             return (Result.NotFound($"Product {command.ProductId} not found"), null);
 
         return (Result.Success(), new ProductDeleted(command.ProductId, DateTime.UtcNow));
+    }
+
+    /// <summary>
+    /// Returns an aggregated catalog summary.
+    /// Simulates an expensive computation (500ms delay) that is cached for 60 seconds.
+    /// First call is slow; subsequent calls return instantly from cache.
+    /// </summary>
+    [AllowAnonymous]
+    [Cached(DurationSeconds = 60)]
+    public async Task<Result<ProductCatalogSummary>> HandleAsync(
+        GetProductCatalog query, ILogger<ProductHandler> logger, CancellationToken cancellationToken)
+    {
+        logger.LogInformation("Computing product catalog summary (this is slow!)...");
+        await Task.Delay(500, cancellationToken); // Simulate expensive aggregation
+
+        var products = await repository.GetAllAsync(cancellationToken);
+        var all = products.ToList();
+
+        return new ProductCatalogSummary(
+            TotalProducts: all.Count,
+            ActiveProducts: all.Count(p => p.Status == ProductStatus.Active),
+            AveragePrice: all.Count > 0 ? all.Average(p => p.Price) : 0m,
+            GeneratedAt: DateTime.UtcNow);
     }
 
     /// <summary>

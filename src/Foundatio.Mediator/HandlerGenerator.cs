@@ -697,8 +697,9 @@ internal static class HandlerGenerator
         else
         {
             // For void handlers: UntypedHandleAsync returns ValueTask<object?> so needs "return null"
+            // Inside an Execute delegate also returns object? so needs "return null"
             // Typed HandleAsync returns ValueTask so needs just "return"
-            source.AppendLine(isUntypedMethod ? "    return null;" : "    return;");
+            source.AppendLine((isUntypedMethod || insideExecuteDelegate) ? "    return null;" : "    return;");
         }
 
         source.AppendLine("}");

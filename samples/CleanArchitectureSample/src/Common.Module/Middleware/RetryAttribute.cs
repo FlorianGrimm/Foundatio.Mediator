@@ -1,7 +1,6 @@
-using ConsoleSample.Middleware;
 using Foundatio.Mediator;
 
-namespace ConsoleSample;
+namespace Common.Module.Middleware;
 
 /// <summary>
 /// Specifies that the handler method or class should use retry logic on transient failures.

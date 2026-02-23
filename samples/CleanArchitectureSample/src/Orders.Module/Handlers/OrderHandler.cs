@@ -1,6 +1,7 @@
 using Common.Module;
 using Common.Module.Events;
 using Common.Module.Filters;
+using Common.Module.Middleware;
 using Foundatio.Mediator;
 using Microsoft.Extensions.Logging;
 using Orders.Module.Data;
@@ -18,8 +19,9 @@ namespace Orders.Module.Handlers;
 public class OrderHandler(IOrderRepository repository)
 {
     /// <summary>
-    /// Creates a new order
+    /// Creates a new order (retries on transient failure)
     /// </summary>
+    [Retry]
     public async Task<(Result<Order>, OrderCreated?)> HandleAsync(CreateOrder command, ILogger<OrderHandler> logger, CancellationToken cancellationToken)
     {
         logger.LogInformation("Creating order requested by {RequestedBy}", command.RequestedBy ?? "unknown");
@@ -62,8 +64,9 @@ public class OrderHandler(IOrderRepository repository)
     }
 
     /// <summary>
-    /// Updates an existing order
+    /// Updates an existing order (retries with aggressive policy)
     /// </summary>
+    [Retry(PolicyName = "aggressive")]
     public async Task<(Result<Order>, OrderUpdated?)> HandleAsync(UpdateOrder command, CancellationToken cancellationToken)
     {
         var existingOrder = await repository.GetByIdAsync(command.OrderId, cancellationToken);
