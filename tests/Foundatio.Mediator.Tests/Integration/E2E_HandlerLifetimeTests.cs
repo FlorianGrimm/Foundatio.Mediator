@@ -177,7 +177,7 @@ public class E2E_MediatorLifetimeTests(ITestOutputHelper output) : TestWithLoggi
     [Fact]
     public async Task DefaultLifetimeHandler_UsesProjectDefault()
     {
-        // The test project has MediatorDefaultHandlerLifetime=Scoped
+        // The test project has [assembly: MediatorConfiguration(HandlerLifetime = MediatorLifetime.Scoped)]
         // So DefaultLifetimeHandler behaves like ScopedHandler - same instance within same scope
 
         var services = new ServiceCollection();

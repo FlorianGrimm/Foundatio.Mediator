@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { ordersApi } from '$lib/api';
   import { OrderList } from '$lib/components/orders';
+  import { AuthGuard } from '$lib/components/layout';
   import { Button, Spinner, Alert } from '$lib/components/ui';
   import { toast } from '$lib/stores/toast.svelte';
   import { signalr } from '$lib/stores/signalr.svelte';
@@ -54,6 +55,7 @@
   <title>Orders - Clean Architecture Sample</title>
 </svelte:head>
 
+<AuthGuard>
 <div class="space-y-6">
   <div class="flex justify-between items-center">
     <h1 class="text-2xl font-bold text-gray-900">Orders</h1>
@@ -77,3 +79,4 @@
     <Alert type="error" message={error.message || 'Failed to load orders'} />
   {/await}
 </div>
+</AuthGuard>

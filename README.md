@@ -165,12 +165,20 @@ This automatically generates:
 - `Result<T>` status mapped to HTTP status codes
 - OpenAPI metadata from XML doc comments
 
-Configure with MSBuild properties:
+Configure with an assembly attribute:
+```csharp
+[assembly: MediatorConfiguration(
+    EndpointDiscovery = EndpointDiscovery.All,
+    EndpointRequireAuth = true,
+    ProjectName = "Products"
+)]
+```
+
+Enable XML documentation for endpoint summaries:
+
 ```xml
 <PropertyGroup>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <MediatorProjectName>Products</MediatorProjectName>
-    <MediatorEndpointRequireAuth>true</MediatorEndpointRequireAuth>
 </PropertyGroup>
 ```
 
@@ -188,7 +196,7 @@ Key topics:
 - [Result Types](https://mediator.foundatio.dev/guide/result-types.html) - Rich status handling
 - [Endpoints](https://mediator.foundatio.dev/guide/endpoints.html) - Auto-generated Minimal API endpoints
 - [Performance](https://mediator.foundatio.dev/guide/performance.html) - Benchmarks vs other libraries
-- [Configuration](https://mediator.foundatio.dev/guide/configuration.html) - MSBuild and runtime options
+- [Configuration](https://mediator.foundatio.dev/guide/configuration.html) - Assembly attribute and runtime options
 
 ## 📂 Sample Applications
 

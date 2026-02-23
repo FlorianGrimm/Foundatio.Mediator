@@ -5,23 +5,14 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>true</ImplicitUsings>
     <IsPackable>false</IsPackable>
-    <IsTestProject>true</IsTestProject>
+    <NoWarn>$(NoWarn);NU1510</NoWarn>
     <!-- Emit compiler generated files for debugging purposes -->
     <CompilerGeneratedFilesOutputPath>Generated</CompilerGeneratedFilesOutputPath>
     <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
     <!--Enable
     interceptors for testing-->
     <InterceptorsNamespaces>$(InterceptorsNamespaces);Foundatio.Mediator</InterceptorsNamespaces>
-    <!-- Default handler lifetime for testing (handlers can override with [Handler(Lifetime = ...)] attribute) -->
-    <MediatorDefaultHandlerLifetime>Scoped</MediatorDefaultHandlerLifetime>
-    <!-- Default middleware lifetime for testing (middleware can override with [Middleware(Lifetime = ...)] attribute) -->
-    <MediatorDefaultMiddlewareLifetime>Scoped</MediatorDefaultMiddlewareLifetime>
   </PropertyGroup>
-
-  <ItemGroup>
-    <CompilerVisibleProperty Include="MediatorDefaultHandlerLifetime" />
-    <CompilerVisibleProperty Include="MediatorDefaultMiddlewareLifetime" />
-  </ItemGroup>
 
   <ItemGroup>
     <!-- Exclude the output of source generators from the compilation -->
@@ -38,7 +29,6 @@
     <PackageReference Include="xunit.v3.mtp-v2" Version="3.2.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.3" />
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.3" />
     <PackageReference Include="Foundatio.Xunit.v3" Version="13.0.0-beta3.poison-message-handling.3" />
     <PackageReference Include="GitHubActionsTestLogger" Version="3.0.1" PrivateAssets="All" />
     <!-- Source generator verification & helpers -->
@@ -61,6 +51,11 @@
       OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
     <!-- Regular reference needed so tests can access generator types -->
     <ProjectReference Include="..\..\src\Foundatio.Mediator\Foundatio.Mediator.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- ASP.NET Core framework reference needed for endpoint generation tests -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
   <ItemGroup>

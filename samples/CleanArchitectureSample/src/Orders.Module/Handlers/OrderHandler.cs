@@ -1,5 +1,6 @@
 using Common.Module;
 using Common.Module.Events;
+using Common.Module.Filters;
 using Foundatio.Mediator;
 using Microsoft.Extensions.Logging;
 using Orders.Module.Data;
@@ -13,14 +14,16 @@ namespace Orders.Module.Handlers;
 /// Following Clean Architecture, this handler orchestrates use cases
 /// and delegates persistence to the IOrderRepository abstraction.
 /// </summary>
-[HandlerCategory("Orders", RoutePrefix = "/api/orders")]
+[HandlerCategory("Orders", Filters = new[] { typeof(SetRequestedByFilter) })]
 public class OrderHandler(IOrderRepository repository)
 {
     /// <summary>
     /// Creates a new order
     /// </summary>
-    public async Task<(Result<Order>, OrderCreated?)> HandleAsync(CreateOrder command, CancellationToken cancellationToken)
+    public async Task<(Result<Order>, OrderCreated?)> HandleAsync(CreateOrder command, ILogger<OrderHandler> logger, CancellationToken cancellationToken)
     {
+        logger.LogInformation("Creating order requested by {RequestedBy}", command.RequestedBy ?? "unknown");
+
         var order = new Order(
             Id: Guid.NewGuid().ToString(),
             CustomerId: command.CustomerId,

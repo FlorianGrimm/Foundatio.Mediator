@@ -118,8 +118,8 @@ public class AnotherService
     public void Process(SendEmail cmd) { /* ... */ }
 }
 
-// Disable conventions entirely via MSBuild
-// <MediatorDisableConventionalDiscovery>true</MediatorDisableConventionalDiscovery>
+// Disable conventions entirely via assembly attribute
+// [assembly: MediatorConfiguration(HandlerDiscovery = HandlerDiscovery.Explicit)]
 ```
 
 ### Rich Error Handling

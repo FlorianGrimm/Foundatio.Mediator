@@ -84,17 +84,18 @@ public class DIRegistrationTests(ITestOutputHelper output) : GeneratorTestBase(o
     [InlineData("Singleton", "AddSingleton<AHandler>()")]
     public void RegistersHandlers_WhenConfigured(string lifetime, string expected)
     {
-        var src = """
+        var src = $$"""
             using System.Threading;
             using System.Threading.Tasks;
             using Foundatio.Mediator;
+
+            [assembly: MediatorConfiguration(HandlerLifetime = MediatorLifetime.{{lifetime}})]
 
             public record A;
             public class AHandler { public Task HandleAsync(A m, CancellationToken ct) => Task.CompletedTask; }
             """;
 
-        var opts = CreateOptions(("build_property.MediatorDefaultHandlerLifetime", lifetime));
-        var (_, _, trees) = RunGenerator(src, [new MediatorGenerator()], opts);
+        var (_, _, trees) = RunGenerator(src, [new MediatorGenerator()]);
         var di = trees.First(t => t.HintName == "_FoundatioModule.cs");
         Assert.Contains(expected, di.Source);
     }
@@ -107,12 +108,13 @@ public class DIRegistrationTests(ITestOutputHelper output) : GeneratorTestBase(o
             using System.Threading.Tasks;
             using Foundatio.Mediator;
 
+            [assembly: MediatorConfiguration(HandlerLifetime = MediatorLifetime.Transient)]
+
             public record A;
             public class AHandler { public static Task HandleAsync(A m, CancellationToken ct) => Task.CompletedTask; }
             """;
 
-        var opts = CreateOptions(("build_property.MediatorDefaultHandlerLifetime", "Transient"));
-        var (_, _, trees) = RunGenerator(src, [new MediatorGenerator()], opts);
+        var (_, _, trees) = RunGenerator(src, [new MediatorGenerator()]);
         var di = trees.First(t => t.HintName == "_FoundatioModule.cs");
         Assert.DoesNotContain("AddTransient<AHandler>()", di.Source);
     }

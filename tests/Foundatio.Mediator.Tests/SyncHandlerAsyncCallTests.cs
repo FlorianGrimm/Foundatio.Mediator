@@ -28,8 +28,7 @@ public class SyncHandlerAsyncCallTests(ITestOutputHelper output) : GeneratorTest
             }
             """;
 
-        var opts = CreateOptions(("build_property.MediatorDisableInterceptors", "false"));
-        var (compilation, diagnostics, trees) = RunGenerator(src, [new MediatorGenerator()], opts);
+        var (compilation, diagnostics, trees) = RunGenerator(src, [new MediatorGenerator()]);
 
         // Should not have any errors
         var errors = diagnostics.Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error).ToList();
@@ -74,8 +73,7 @@ public class SyncHandlerAsyncCallTests(ITestOutputHelper output) : GeneratorTest
             }
             """;
 
-        var opts = CreateOptions(("build_property.MediatorDisableInterceptors", "false"));
-        var (compilation, diagnostics, trees) = RunGenerator(src, [new MediatorGenerator()], opts);
+        var (compilation, diagnostics, trees) = RunGenerator(src, [new MediatorGenerator()]);
 
         var errors = diagnostics.Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error).ToList();
         Assert.Empty(errors);
@@ -119,8 +117,7 @@ public class SyncHandlerAsyncCallTests(ITestOutputHelper output) : GeneratorTest
             }
             """;
 
-        var opts = CreateOptions(("build_property.MediatorDisableInterceptors", "false"));
-        var (compilation, diagnostics, trees) = RunGenerator(src, [new MediatorGenerator()], opts);
+        var (compilation, diagnostics, trees) = RunGenerator(src, [new MediatorGenerator()]);
 
         // Should not have any generator errors
         var generatorErrors = diagnostics.Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error).ToList();
@@ -175,8 +172,7 @@ public class SyncHandlerAsyncCallTests(ITestOutputHelper output) : GeneratorTest
             }
             """;
 
-        var opts = CreateOptions(("build_property.MediatorDisableInterceptors", "false"));
-        var (compilation, diagnostics, trees) = RunGenerator(src, [new MediatorGenerator()], opts);
+        var (compilation, diagnostics, trees) = RunGenerator(src, [new MediatorGenerator()]);
 
         // Should have an error about using sync Invoke with tuple-returning handler
         var errors = diagnostics.Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error).ToList();

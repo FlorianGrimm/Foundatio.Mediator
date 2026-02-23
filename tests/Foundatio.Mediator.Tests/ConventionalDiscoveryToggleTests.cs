@@ -19,8 +19,7 @@ public class ConventionalDiscoveryToggleTests(ITestOutputHelper output) : Genera
             }
             """;
 
-        var opts = CreateOptions(("build_property.MediatorDisableConventionalDiscovery", "false"));
-        var (_, _, trees) = RunGenerator(src, [new MediatorGenerator()], opts);
+        var (_, _, trees) = RunGenerator(src, [new MediatorGenerator()]);
 
         // Handler should be discovered and a wrapper generated
         Assert.Contains(trees, t => t.HintName.Contains("MyMessage_Handler.g.cs"));
@@ -34,6 +33,8 @@ public class ConventionalDiscoveryToggleTests(ITestOutputHelper output) : Genera
             using System.Threading.Tasks;
             using Foundatio.Mediator;
 
+            [assembly: MediatorConfiguration(HandlerDiscovery = HandlerDiscovery.Explicit)]
+
             public record MyMessage;
 
             // Should NOT be discovered when conventional discovery is disabled
@@ -43,8 +44,7 @@ public class ConventionalDiscoveryToggleTests(ITestOutputHelper output) : Genera
             }
             """;
 
-        var opts = CreateOptions(("build_property.MediatorDisableConventionalDiscovery", "true"));
-        var (_, _, trees) = RunGenerator(src, [new MediatorGenerator()], opts);
+        var (_, _, trees) = RunGenerator(src, [new MediatorGenerator()]);
 
         // Handler should NOT be discovered
         Assert.DoesNotContain(trees, t => t.HintName.Contains("MyMessage_Handler.g.cs"));
@@ -58,6 +58,8 @@ public class ConventionalDiscoveryToggleTests(ITestOutputHelper output) : Genera
             using System.Threading.Tasks;
             using Foundatio.Mediator;
 
+            [assembly: MediatorConfiguration(HandlerDiscovery = HandlerDiscovery.Explicit)]
+
             public record MyMessage;
 
             // Discovered via IHandler interface
@@ -67,8 +69,7 @@ public class ConventionalDiscoveryToggleTests(ITestOutputHelper output) : Genera
             }
             """;
 
-        var opts = CreateOptions(("build_property.MediatorDisableConventionalDiscovery", "true"));
-        var (_, _, trees) = RunGenerator(src, [new MediatorGenerator()], opts);
+        var (_, _, trees) = RunGenerator(src, [new MediatorGenerator()]);
 
         // Handler should be discovered via IHandler interface
         Assert.Contains(trees, t => t.HintName.Contains("MyMessage_Handler.g.cs"));
@@ -82,6 +83,8 @@ public class ConventionalDiscoveryToggleTests(ITestOutputHelper output) : Genera
             using System.Threading.Tasks;
             using Foundatio.Mediator;
 
+            [assembly: MediatorConfiguration(HandlerDiscovery = HandlerDiscovery.Explicit)]
+
             public record MyMessage;
 
             // Discovered via [Handler] attribute on class
@@ -92,8 +95,7 @@ public class ConventionalDiscoveryToggleTests(ITestOutputHelper output) : Genera
             }
             """;
 
-        var opts = CreateOptions(("build_property.MediatorDisableConventionalDiscovery", "true"));
-        var (_, _, trees) = RunGenerator(src, [new MediatorGenerator()], opts);
+        var (_, _, trees) = RunGenerator(src, [new MediatorGenerator()]);
 
         // Handler should be discovered via [Handler] attribute
         Assert.Contains(trees, t => t.HintName.Contains("MyMessage_Handler.g.cs"));
@@ -107,6 +109,8 @@ public class ConventionalDiscoveryToggleTests(ITestOutputHelper output) : Genera
             using System.Threading.Tasks;
             using Foundatio.Mediator;
 
+            [assembly: MediatorConfiguration(HandlerDiscovery = HandlerDiscovery.Explicit)]
+
             public record MyMessage;
 
             // Discovered via [Handler] attribute on method
@@ -117,8 +121,7 @@ public class ConventionalDiscoveryToggleTests(ITestOutputHelper output) : Genera
             }
             """;
 
-        var opts = CreateOptions(("build_property.MediatorDisableConventionalDiscovery", "true"));
-        var (_, _, trees) = RunGenerator(src, [new MediatorGenerator()], opts);
+        var (_, _, trees) = RunGenerator(src, [new MediatorGenerator()]);
 
         // Handler should be discovered via [Handler] attribute on method
         Assert.Contains(trees, t => t.HintName.Contains("MyMessage_Handler.g.cs"));
@@ -141,8 +144,8 @@ public class ConventionalDiscoveryToggleTests(ITestOutputHelper output) : Genera
             }
             """;
 
-        // No options set - defaults to conventional discovery enabled
-        var (_, _, trees) = RunGenerator(src, [new MediatorGenerator()], optionsProvider: null);
+        // No configuration attribute - defaults to conventional discovery enabled
+        var (_, _, trees) = RunGenerator(src, [new MediatorGenerator()]);
 
         // Handler should be discovered
         Assert.Contains(trees, t => t.HintName.Contains("MyMessage_Handler.g.cs"));
@@ -155,6 +158,8 @@ public class ConventionalDiscoveryToggleTests(ITestOutputHelper output) : Genera
             using System.Threading;
             using System.Threading.Tasks;
             using Foundatio.Mediator;
+
+            [assembly: MediatorConfiguration(HandlerDiscovery = HandlerDiscovery.Explicit)]
 
             public record Message1;
             public record Message2;
@@ -180,8 +185,7 @@ public class ConventionalDiscoveryToggleTests(ITestOutputHelper output) : Genera
             }
             """;
 
-        var opts = CreateOptions(("build_property.MediatorDisableConventionalDiscovery", "true"));
-        var (_, _, trees) = RunGenerator(src, [new MediatorGenerator()], opts);
+        var (_, _, trees) = RunGenerator(src, [new MediatorGenerator()]);
 
         // Message1Handler should NOT be discovered (conventional only)
         Assert.DoesNotContain(trees, t => t.HintName.Contains("Message1_Handler.g.cs"));

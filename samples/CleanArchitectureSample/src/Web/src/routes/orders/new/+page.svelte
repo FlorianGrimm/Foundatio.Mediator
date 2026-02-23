@@ -2,6 +2,7 @@
   import { goto } from '$app/navigation';
   import { ordersApi } from '$lib/api';
   import { OrderForm } from '$lib/components/orders';
+  import { AuthGuard } from '$lib/components/layout';
   import { Card } from '$lib/components/ui';
   import { toast } from '$lib/stores/toast.svelte';
   import type { CreateOrderRequest } from '$lib/types/order';
@@ -26,6 +27,7 @@
   <title>New Order - Clean Architecture Sample</title>
 </svelte:head>
 
+<AuthGuard>
 <div class="max-w-2xl">
   <div class="mb-6">
     <h1 class="text-2xl font-bold text-gray-900">Create New Order</h1>
@@ -36,3 +38,4 @@
     <OrderForm onsubmit={handleSubmit} {loading} />
   </Card>
 </div>
+</AuthGuard>

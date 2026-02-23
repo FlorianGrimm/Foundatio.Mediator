@@ -1,63 +1,47 @@
 # Configuration Options
 
-Foundatio Mediator provides two types of configuration: **compile-time configuration** via MSBuild properties that control source generator behavior, and **runtime configuration** via the `AddMediator()` method that controls mediator behavior.
+Foundatio Mediator provides two types of configuration: **compile-time configuration** via the `[assembly: MediatorConfiguration]` attribute that controls source generator behavior, and **runtime configuration** via the `AddMediator()` method that controls mediator behavior.
 
-## Compile-Time Configuration (MSBuild Properties)
+## Compile-Time Configuration (Assembly Attribute)
 
-These properties control the source generator at compile time and affect code generation:
+All source generator settings—handler discovery, lifetimes, interceptors, telemetry, and endpoint generation—are configured through a single assembly-level attribute:
 
-### Available MSBuild Properties
+```csharp
+using Foundatio.Mediator;
 
-```xml
-<PropertyGroup>
-    <!-- Default lifetime for handlers that don't specify one (see per-handler lifetime below) -->
-    <MediatorDefaultHandlerLifetime>Scoped</MediatorDefaultHandlerLifetime>
-
-    <!-- Default lifetime for middleware that don't specify one (see per-middleware lifetime below) -->
-    <MediatorDefaultMiddlewareLifetime>Scoped</MediatorDefaultMiddlewareLifetime>
-
-    <!-- Control interceptor generation (default: false) -->
-    <MediatorDisableInterceptors>true</MediatorDisableInterceptors>
-
-    <!-- Disable OpenTelemetry integration (default: false) -->
-    <MediatorDisableOpenTelemetry>true</MediatorDisableOpenTelemetry>
-
-    <!-- Disable conventional handler discovery (default: false) -->
-    <MediatorDisableConventionalDiscovery>true</MediatorDisableConventionalDiscovery>
-
-    <!-- Endpoint generation settings (see Endpoints guide for details) -->
-    <MediatorEndpointDiscovery>All</MediatorEndpointDiscovery>
-    <MediatorEndpointRequireAuth>false</MediatorEndpointRequireAuth>
-    <MediatorProjectName>MyProject</MediatorProjectName>
-</PropertyGroup>
+[assembly: MediatorConfiguration(
+    HandlerLifetime = MediatorLifetime.Scoped,
+    EndpointDiscovery = EndpointDiscovery.All,
+    EndpointRoutePrefix = "/api"
+)]
 ```
 
 ### Property Details
 
-**`MediatorDefaultHandlerLifetime`**
+**`HandlerLifetime`** (`MediatorLifetime` enum)
 
-- **Values:** `Scoped`, `Transient`, `Singleton`, `None`
-- **Default:** `None` (handlers use internal caching)
+- **Values:** `Default`, `Transient`, `Scoped`, `Singleton`
+- **Default:** `Default` (handlers use internal caching)
 - **Effect:** Registers all discovered handlers with the specified DI lifetime, unless overridden by `[Handler(Lifetime = ...)]` attribute
 - **Behavior by value:**
   - `Scoped`/`Transient`/`Singleton`: Always resolved from DI on every invocation
-  - `None`: Handlers are cached internally (no constructor deps → `new()`, with constructor deps → `ActivatorUtilities.CreateInstance`)
+  - `Default`: Handlers are cached internally (no constructor deps → `new()`, with constructor deps → `ActivatorUtilities.CreateInstance`)
 
-**`MediatorDefaultMiddlewareLifetime`**
+**`MiddlewareLifetime`** (`MediatorLifetime` enum)
 
-- **Values:** `Scoped`, `Transient`, `Singleton`, `None`
-- **Default:** `None` (middleware uses internal caching)
+- **Values:** `Default`, `Transient`, `Scoped`, `Singleton`
+- **Default:** `Default` (middleware uses internal caching)
 - **Effect:** Registers all discovered middleware with the specified DI lifetime, unless overridden by `[Middleware(Lifetime = ...)]` attribute
 - **Behavior by value:**
   - `Scoped`/`Transient`/`Singleton`: Always resolved from DI on every invocation
-  - `None`: Middleware is cached internally (no constructor deps → `new()`, with constructor deps → `ActivatorUtilities.CreateInstance`)
+  - `Default`: Middleware is cached internally (no constructor deps → `new()`, with constructor deps → `ActivatorUtilities.CreateInstance`)
 
 ### Per-Handler Lifetime Override
 
 Individual handlers can override the project-level default lifetime using the `[Handler]` attribute:
 
 ```csharp
-// Uses project-level MediatorDefaultHandlerLifetime
+// Uses project-level HandlerLifetime from [assembly: MediatorConfiguration]
 public class DefaultLifetimeHandler
 {
     public Task HandleAsync(MyMessage msg) => Task.CompletedTask;
@@ -86,7 +70,7 @@ public class FirstScopedHandler
 ```
 
 **Available `MediatorLifetime` values:**
-- `MediatorLifetime.Default` - Use project-level `MediatorDefaultHandlerLifetime`
+- `MediatorLifetime.Default` - Use project-level `HandlerLifetime` from `[assembly: MediatorConfiguration]`
 - `MediatorLifetime.Transient` - New instance per request
 - `MediatorLifetime.Scoped` - Same instance within a scope
 - `MediatorLifetime.Singleton` - Single instance for application lifetime
@@ -96,7 +80,7 @@ public class FirstScopedHandler
 Individual middleware can override the project-level default lifetime using the `[Middleware]` attribute:
 
 ```csharp
-// Uses project-level MediatorDefaultMiddlewareLifetime
+// Uses project-level MiddlewareLifetime from [assembly: MediatorConfiguration]
 public class DefaultLifetimeMiddleware
 {
     public void Before(object msg) { }
@@ -130,59 +114,107 @@ public class FirstTransientMiddleware
 }
 ```
 
-**`MediatorDisableInterceptors`**
+**`DisableInterceptors`** (`bool`)
 
-- **Values:** `true`, `false`
 - **Default:** `false`
 - **Effect:** When `true`, disables C# interceptor generation and forces DI-based dispatch for all calls
 - **Use Case:** Debugging, cross-assembly calls, or when interceptors are not supported
 
-**`MediatorDisableOpenTelemetry`**
+**`DisableOpenTelemetry`** (`bool`)
 
-- **Values:** `true`, `false`
 - **Default:** `false`
 - **Effect:** When `true`, disables OpenTelemetry integration code generation
 - **Use Case:** Reduce generated code size when telemetry is not needed
 
-**`MediatorDisableConventionalDiscovery`**
-
-- **Values:** `true`, `false`
-- **Default:** `false`
-- **Effect:** When `true`, disables convention-based handler discovery (class names ending with `Handler` or `Consumer`). Only handlers that implement `IHandler` interface or have the `[Handler]` attribute will be discovered.
-- **Use Case:** Explicit control over which classes are treated as handlers, avoiding accidental handler discovery
-
-**`MediatorEndpointDiscovery`**
+**`HandlerDiscovery`** (`HandlerDiscovery` enum)
 
 - **Values:** `All`, `Explicit`
 - **Default:** `All`
-- **Effect:** Controls which handlers generate API endpoints
-  - `All`: All handlers with endpoint-compatible message types generate endpoints (use `[HandlerEndpoint(Exclude = true)]` to opt out)
-  - `Explicit`: Only handlers with `[HandlerEndpoint]` attribute generate endpoints
-- **Use Case:** Control granularity of automatic endpoint generation
-- **See:** [Endpoints Guide](/guide/endpoints) for full documentation
+- **Effect:** Controls how handlers are discovered at compile time
+  - `All`: Convention-based discovery (class names ending with `Handler` or `Consumer`) plus `IHandler` interface and `[Handler]` attribute
+  - `Explicit`: Only handlers that implement `IHandler` interface or have the `[Handler]` attribute will be discovered
+- **Use Case:** Explicit control over which classes are treated as handlers, avoiding accidental handler discovery
 
-**`MediatorEndpointRequireAuth`**
+**`NotificationPublisher`** (`NotificationPublisher` enum)
 
-- **Values:** `true`, `false`
-- **Default:** `false`
-- **Effect:** Sets the default authentication requirement for all generated endpoints
-- **Use Case:** Secure-by-default API with opt-out for public endpoints
-- **Override:** Use `[HandlerCategory(RequireAuth = false)]` or `[HandlerEndpoint(RequireAuth = false)]` to override per category or endpoint
-- **See:** [Endpoints Guide](/guide/endpoints) for full documentation
+- **Values:** `ForeachAwait`, `TaskWhenAll`, `FireAndForget`
+- **Default:** `ForeachAwait`
+- **Effect:** Controls how `PublishAsync` dispatches messages to multiple handlers
+  - `ForeachAwait`: Invokes handlers sequentially, one at a time
+  - `TaskWhenAll`: Invokes all handlers concurrently and waits for all to complete
+  - `FireAndForget`: Fires all handlers in parallel without waiting
 
-**`MediatorProjectName`**
+**`ProjectName`** (`string?`)
 
-- **Values:** Any valid C# identifier
 - **Default:** Assembly name (with dots/dashes replaced by underscores)
 - **Effect:** Controls the suffix used in generated endpoint extension methods and classes
-- **Example:** Setting `<MediatorProjectName>Products</MediatorProjectName>` generates:
+- **Example:** Setting `ProjectName = "Products"` generates:
   - `MapProductsEndpoints()` extension method
   - `MediatorEndpointExtensions_Products` class
   - `MediatorEndpointResultMapper_Products` class
 - **Use Case:** Meaningful endpoint method names in modular monolith architectures
 - **See:** [Endpoints Guide](/guide/endpoints) for full documentation
 
-### Example .csproj Configuration
+**`EnableGenerationCounter`** (`bool`)
+
+- **Default:** `false`
+- **Effect:** When `true`, includes a generation counter comment in generated files
+- **Use Case:** Debugging source generator incremental caching
+
+### Endpoint Properties
+
+The following properties on `MediatorConfigurationAttribute` control endpoint generation:
+
+**`EndpointDiscovery`** (`EndpointDiscovery` enum)
+
+- **Values:** `None`, `Explicit`, `All`
+- **Default:** `None` (no endpoints generated)
+- **Effect:** Controls which handlers generate API endpoints
+  - `None`: No endpoints generated (default)
+  - `All`: All handlers with endpoint-compatible message types generate endpoints (use `[HandlerEndpoint(Exclude = true)]` to opt out)
+  - `Explicit`: Only handlers with `[HandlerEndpoint]` attribute generate endpoints
+- **See:** [Endpoints Guide](/guide/endpoints) for full documentation
+
+**`EndpointRoutePrefix`** (`string?`)
+
+- **Default:** `"/api"`
+- **Effect:** Sets a global route prefix that all category groups nest under. Categories auto-derive their route from their name (e.g., `[HandlerCategory("Products")]` → `/products`), composing with the global prefix to produce `/api/products`.
+
+**`EndpointRequireAuth`** (`bool`)
+
+- **Default:** `false`
+- **Effect:** Sets the default authentication requirement for all generated endpoints
+- **Use Case:** Secure-by-default API with opt-out for public endpoints
+- **Override:** Use `[HandlerCategory(RequireAuth = false)]` or `[HandlerEndpoint(RequireAuth = false)]` to override per category or endpoint
+
+**`EndpointFilters`** (`Type[]?`)
+
+- **Default:** None
+- **Effect:** Applies endpoint filters to the root MapGroup, affecting all generated endpoints
+- **Example:** `EndpointFilters = new[] { typeof(LoggingFilter), typeof(ValidationFilter) }`
+
+**`EndpointPolicy`** / **`EndpointRoles`**
+
+- **Values:** String / String array
+- **Default:** None
+- **Effect:** Sets authorization policy and roles on the root group
+
+### Example Configuration
+
+All configuration is done via the assembly attribute in any `.cs` file in your project:
+
+```csharp
+using Foundatio.Mediator;
+
+[assembly: MediatorConfiguration(
+    HandlerLifetime = MediatorLifetime.Scoped,
+    MiddlewareLifetime = MediatorLifetime.Scoped,
+    EndpointDiscovery = EndpointDiscovery.All,
+    EndpointRoutePrefix = "/api"
+)]
+```
+
+Your `.csproj` only needs the package reference and optional XML doc generation:
 
 ```xml
 <Project Sdk="Microsoft.NET.Sdk.Web">
@@ -193,18 +225,6 @@ public class FirstTransientMiddleware
     <!-- Enable XML docs for endpoint summaries -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
-
-    <!-- Compile-time configuration -->
-    <MediatorDefaultHandlerLifetime>Scoped</MediatorDefaultHandlerLifetime>
-    <MediatorDefaultMiddlewareLifetime>Scoped</MediatorDefaultMiddlewareLifetime>
-    <MediatorDisableInterceptors>false</MediatorDisableInterceptors>
-    <MediatorDisableOpenTelemetry>true</MediatorDisableOpenTelemetry>
-    <MediatorDisableConventionalDiscovery>false</MediatorDisableConventionalDiscovery>
-
-    <!-- Endpoint generation configuration -->
-    <MediatorEndpointDiscovery>All</MediatorEndpointDiscovery>
-    <MediatorEndpointRequireAuth>false</MediatorEndpointRequireAuth>
-    <MediatorProjectName>MyApp</MediatorProjectName>
   </PropertyGroup>
 
   <PackageReference Include="Foundatio.Mediator" Version="1.0.0" />
@@ -300,14 +320,12 @@ builder.Services.AddScoped<OrderHandler>();
 builder.Services.AddTransient<EmailHandler>();
 ```
 
-## MSBuild Configuration
+## Assembly-Level Configuration
 
 Disable interceptors if you need to force DI dispatch:
 
-```xml
-<PropertyGroup>
-    <MediatorDisableInterceptors>true</MediatorDisableInterceptors>
-</PropertyGroup>
+```csharp
+[assembly: MediatorConfiguration(DisableInterceptors = true)]
 ```
 
 ## Dependency Injection Integration

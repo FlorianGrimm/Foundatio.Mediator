@@ -14,6 +14,7 @@ internal static class EndpointGenerator
     public static void Execute(
         SourceProductionContext context,
         List<HandlerInfo> handlers,
+        EndpointDefaultsInfo endpointDefaults,
         GeneratorConfiguration configuration,
         Compilation compilation)
     {
@@ -22,13 +23,13 @@ internal static class EndpointGenerator
             return;
 
         // Filter handlers that should generate endpoints based on discovery mode
-        var endpointHandlers = GetEndpointHandlers(handlers, configuration);
+        var endpointHandlers = GetEndpointHandlers(handlers, endpointDefaults);
 
         if (endpointHandlers.Count == 0)
             return;
 
         // Generate the endpoint registration code
-        var source = GenerateEndpointCode(endpointHandlers, configuration, compilation);
+        var source = GenerateEndpointCode(endpointHandlers, endpointDefaults, configuration, compilation);
         context.AddSource("_MediatorEndpoints.g.cs", source);
     }
 
@@ -45,23 +46,24 @@ internal static class EndpointGenerator
     /// <summary>
     /// Filters handlers based on endpoint discovery mode.
     /// </summary>
-    private static List<HandlerInfo> GetEndpointHandlers(List<HandlerInfo> handlers, GeneratorConfiguration configuration)
+    private static List<HandlerInfo> GetEndpointHandlers(List<HandlerInfo> handlers, EndpointDefaultsInfo endpointDefaults)
     {
-        return configuration.EndpointDiscoveryMode switch
+        return endpointDefaults.Discovery switch
         {
             "Explicit" => handlers
-                .Where(h => h.Endpoint?.GenerateEndpoint == true)
+                .Where(h => h.Endpoint is { GenerateEndpoint: true, HasExplicitEndpointAttribute: true } && !h.MessageType.IsInterface)
                 .ToList(),
-            _ => handlers // "All" mode - include all handlers with endpoint info unless excluded
-                .Where(h => h.Endpoint != null && h.Endpoint.Value.GenerateEndpoint)
-                .ToList()
+            "All" => handlers
+                .Where(h => h.Endpoint is { GenerateEndpoint: true } && !h.MessageType.IsInterface)
+                .ToList(),
+            _ => [] // "None" mode - no endpoints generated
         };
     }
 
     /// <summary>
     /// Generates the complete endpoint registration source code.
     /// </summary>
-    private static string GenerateEndpointCode(List<HandlerInfo> handlers, GeneratorConfiguration configuration, Compilation compilation)
+    private static string GenerateEndpointCode(List<HandlerInfo> handlers, EndpointDefaultsInfo endpointDefaults, GeneratorConfiguration configuration, Compilation compilation)
     {
         var source = new IndentedStringBuilder();
 
@@ -94,7 +96,7 @@ internal static class EndpointGenerator
         source.IncrementIndent();
 
         // Generate MapMediatorEndpoints extension method with unique name
-        GenerateMapMediatorEndpointsMethod(source, handlers, configuration, hasAsParametersAttribute, hasFromBodyAttribute, hasWithOpenApi, safeSuffix);
+        GenerateMapMediatorEndpointsMethod(source, handlers, endpointDefaults, configuration, hasAsParametersAttribute, hasFromBodyAttribute, hasWithOpenApi, safeSuffix);
 
         source.DecrementIndent();
         source.AppendLine("}");
@@ -112,6 +114,7 @@ internal static class EndpointGenerator
     private static void GenerateMapMediatorEndpointsMethod(
         IndentedStringBuilder source,
         List<HandlerInfo> handlers,
+        EndpointDefaultsInfo endpointDefaults,
         GeneratorConfiguration configuration,
         bool hasAsParametersAttribute,
         bool hasFromBodyAttribute,
@@ -127,6 +130,71 @@ internal static class EndpointGenerator
         source.AppendLine("{");
         source.IncrementIndent();
 
+        // Determine the parent variable name for category groups
+        string parentGroupVar = "endpoints";
+
+        // Emit global root group if a global route prefix is configured
+        bool hasGlobalGroup = !string.IsNullOrEmpty(endpointDefaults.RoutePrefix);
+        if (hasGlobalGroup)
+        {
+            source.AppendLine();
+            source.AppendLine("// Global route prefix");
+            source.Append($"var rootGroup = endpoints.MapGroup(\"{endpointDefaults.RoutePrefix}\")");
+
+            // Apply global auth
+            if (endpointDefaults.RequireAuth)
+            {
+                if (!string.IsNullOrEmpty(endpointDefaults.Policy))
+                    source.Append($".RequireAuthorization(\"{endpointDefaults.Policy}\")");
+                else if (endpointDefaults.Roles.Any())
+                {
+                    var rolesStr = string.Join("\", \"", endpointDefaults.Roles);
+                    source.Append($".RequireAuthorization(policy => policy.RequireRole(\"{rolesStr}\"))");
+                }
+                else
+                    source.Append(".RequireAuthorization()");
+            }
+
+            source.AppendLine(";");
+
+            // Apply global filters
+            foreach (var filter in endpointDefaults.Filters)
+            {
+                source.AppendLine($"rootGroup.AddEndpointFilter<{filter}>();");
+            }
+
+            parentGroupVar = "rootGroup";
+        }
+        else if (endpointDefaults.Filters.Any() || endpointDefaults.RequireAuth)
+        {
+            // No route prefix but have global filters/auth — use empty group
+            source.AppendLine();
+            source.AppendLine("// Global endpoint defaults");
+            source.Append("var rootGroup = endpoints.MapGroup(\"\")");
+
+            if (endpointDefaults.RequireAuth)
+            {
+                if (!string.IsNullOrEmpty(endpointDefaults.Policy))
+                    source.Append($".RequireAuthorization(\"{endpointDefaults.Policy}\")");
+                else if (endpointDefaults.Roles.Any())
+                {
+                    var rolesStr = string.Join("\", \"", endpointDefaults.Roles);
+                    source.Append($".RequireAuthorization(policy => policy.RequireRole(\"{rolesStr}\"))");
+                }
+                else
+                    source.Append(".RequireAuthorization()");
+            }
+
+            source.AppendLine(";");
+
+            foreach (var filter in endpointDefaults.Filters)
+            {
+                source.AppendLine($"rootGroup.AddEndpointFilter<{filter}>();");
+            }
+
+            parentGroupVar = "rootGroup";
+        }
+
         // Group handlers by category
         var handlersByCategory = handlers
             .GroupBy(h => h.Endpoint?.Category ?? "Default")
@@ -140,16 +208,15 @@ internal static class EndpointGenerator
 
             // Get category route prefix from first handler
             var firstEndpoint = categoryHandlers.First().Endpoint!.Value;
-            var routePrefix = firstEndpoint.CategoryRoutePrefix ?? "/api";
+            var routePrefix = firstEndpoint.CategoryRoutePrefix ?? "";
 
             source.AppendLine();
             source.AppendLine($"// {category} endpoints");
 
             // Create route group for the category
             var groupVarName = $"{ToCamelCase(category)}Group";
-            var groupRequiresAuth = categoryHandlers.Any(h => h.Endpoint?.RequireAuth == true);
 
-            source.Append($"var {groupVarName} = endpoints.MapGroup(\"{routePrefix}\")");
+            source.Append($"var {groupVarName} = {parentGroupVar}.MapGroup(\"{routePrefix}\")");
 
             // Only add tag if category is explicitly defined (not "Default")
             if (category != "Default")
@@ -157,14 +224,22 @@ internal static class EndpointGenerator
                 source.Append($".WithTags(\"{category}\")");
             }
 
-            // Add category-level auth if all handlers in category require auth
-            var categoryRequireAuth = firstEndpoint.RequireAuth;
+            // Add category-level auth if the category requires auth (and global doesn't already)
+            var categoryRequireAuth = firstEndpoint.RequireAuth && !endpointDefaults.RequireAuth;
             if (categoryRequireAuth && !firstEndpoint.Policies.Any() && !firstEndpoint.Roles.Any())
             {
                 source.Append(".RequireAuthorization()");
             }
 
             source.AppendLine(";");
+
+            // Apply category-level filters
+            var categoryFilters = firstEndpoint.CategoryFilters;
+            foreach (var filter in categoryFilters)
+            {
+                source.AppendLine($"{groupVarName}.AddEndpointFilter<{filter}>();");
+            }
+
             source.AppendLine();
 
             // Detect duplicate routes within this category and resolve conflicts
@@ -177,7 +252,7 @@ internal static class EndpointGenerator
                 // Use the unique handler key that includes message type
                 var handlerKey = HandlerGenerator.GetHandlerClassName(handler);
                 routeOverrides.TryGetValue(handlerKey, out var routeOverride);
-                GenerateEndpoint(source, handler, groupVarName, hasAsParametersAttribute, hasFromBodyAttribute, hasWithOpenApi, categoryRequireAuth, assemblySuffix, routeOverride);
+                GenerateEndpoint(source, handler, groupVarName, hasAsParametersAttribute, hasFromBodyAttribute, hasWithOpenApi, categoryRequireAuth || endpointDefaults.RequireAuth, assemblySuffix, routeOverride);
             }
         }
 
@@ -280,8 +355,14 @@ internal static class EndpointGenerator
             source.AppendLine($".WithDescription(\"{escapedDescription}\")");
         }
 
+        // Add AllowAnonymous if handler opts out of group-level auth
+        if (endpoint.AllowAnonymous)
+        {
+            source.AppendLine(".AllowAnonymous()");
+        }
+
         // Add endpoint-specific auth if different from category
-        if (endpoint.RequireAuth && !categoryRequireAuth)
+        if (!endpoint.AllowAnonymous && endpoint.RequireAuth && !categoryRequireAuth)
         {
             if (endpoint.Policies.Any())
             {
@@ -300,14 +381,14 @@ internal static class EndpointGenerator
                 source.AppendLine(".RequireAuthorization()");
             }
         }
-        else if (endpoint.Policies.Any())
+        else if (!endpoint.AllowAnonymous && endpoint.Policies.Any())
         {
             foreach (var policy in endpoint.Policies)
             {
                 source.AppendLine($".RequireAuthorization(\"{policy}\")");
             }
         }
-        else if (endpoint.Roles.Any())
+        else if (!endpoint.AllowAnonymous && endpoint.Roles.Any())
         {
             var rolesStr = string.Join("\", \"", endpoint.Roles);
             source.AppendLine($".RequireAuthorization(policy => policy.RequireRole(\"{rolesStr}\"))");
@@ -316,6 +397,19 @@ internal static class EndpointGenerator
         if (hasWithOpenApi)
         {
             source.AppendLine(".WithOpenApi()");
+        }
+
+        // Add Produces<T> metadata from return type
+        if (!string.IsNullOrEmpty(endpoint.ProducesType))
+        {
+            var statusCode = httpMethod == "POST" ? "201" : "200";
+            source.AppendLine($".Produces<{endpoint.ProducesType}>({statusCode})");
+        }
+
+        // Add endpoint-level filters
+        foreach (var filter in endpoint.Filters)
+        {
+            source.AppendLine($".AddEndpointFilter<{filter}>()");
         }
 
         source.DecrementIndent();

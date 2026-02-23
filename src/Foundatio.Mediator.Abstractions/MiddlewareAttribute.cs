@@ -30,8 +30,8 @@ public sealed class MiddlewareAttribute : Attribute
 
     /// <summary>
     /// Gets or sets the dependency injection lifetime for this middleware.
-    /// When set to <see cref="MediatorLifetime.Default"/>, uses the project-level
-    /// MediatorDefaultMiddlewareLifetime MSBuild property.
+    /// When set to <see cref="MediatorLifetime.Default"/>, uses the assembly-level
+    /// <see cref="MediatorConfigurationAttribute.MiddlewareLifetime"/> setting.
     /// </summary>
     public MediatorLifetime Lifetime { get; set; } = MediatorLifetime.Default;
 

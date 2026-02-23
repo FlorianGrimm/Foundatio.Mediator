@@ -6,9 +6,8 @@ namespace Foundatio.Mediator;
 public enum MediatorLifetime
 {
     /// <summary>
-    /// Use the default lifetime specified by the project-level MSBuild property
-    /// (MediatorDefaultHandlerLifetime for handlers, MediatorDefaultMiddlewareLifetime for middleware).
-    /// If no default is specified, the component will not be automatically registered.
+    /// Use the default lifetime from <see cref="MediatorConfigurationAttribute"/>.
+    /// If no default is specified, the component is internally cached (best performance).
     /// </summary>
     Default = 0,
 

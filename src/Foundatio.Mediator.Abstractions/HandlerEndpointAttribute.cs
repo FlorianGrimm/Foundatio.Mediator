@@ -60,7 +60,7 @@ public sealed class HandlerEndpointAttribute : Attribute
 
     /// <summary>
     /// Gets or sets whether this endpoint requires authentication.
-    /// When null, uses the category's RequireAuth setting, then the global MediatorEndpointRequireAuth setting.
+    /// When null, uses the category's RequireAuth setting, then the global <see cref="MediatorConfigurationAttribute.EndpointRequireAuth"/> setting.
     /// </summary>
     public bool RequireAuth { get; set; }
 
@@ -86,4 +86,11 @@ public sealed class HandlerEndpointAttribute : Attribute
     /// All policies must be satisfied.
     /// </summary>
     public string[]? Policies { get; set; }
+
+    /// <summary>
+    /// Gets or sets the endpoint filter types for this endpoint.
+    /// Each type must implement <c>Microsoft.AspNetCore.Http.IEndpointFilter</c>.
+    /// These filters are additive to any global or category-level filters.
+    /// </summary>
+    public Type[]? Filters { get; set; }
 }

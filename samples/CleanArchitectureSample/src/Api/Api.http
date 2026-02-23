@@ -4,6 +4,27 @@
 # CLEAN ARCHITECTURE DEMO - Key Features
 ###############################################################################
 
+# AUTHENTICATION - All API endpoints require authentication
+# ────────────────────────────────────────────────────────────────────────────
+
+### Login as admin (Alice Admin)
+# @name login
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "admin"
+}
+
+### Check current user
+GET {{baseUrl}}/api/auth/me
+Accept: application/json
+
+### Logout
+POST {{baseUrl}}/api/auth/logout
+
+
 # 1. CROSS-MODULE QUERIES - Reports module queries other modules via mediator
 # ────────────────────────────────────────────────────────────────────────────
 

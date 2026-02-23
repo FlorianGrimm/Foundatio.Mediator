@@ -2,6 +2,7 @@
   import { goto } from '$app/navigation';
   import { productsApi } from '$lib/api';
   import { ProductForm } from '$lib/components/products';
+  import { AuthGuard } from '$lib/components/layout';
   import { Card } from '$lib/components/ui';
   import { toast } from '$lib/stores/toast.svelte';
   import type { CreateProductRequest } from '$lib/types/product';
@@ -26,6 +27,7 @@
   <title>New Product - Clean Architecture Sample</title>
 </svelte:head>
 
+<AuthGuard>
 <div class="max-w-2xl">
   <div class="mb-6">
     <h1 class="text-2xl font-bold text-gray-900">Create New Product</h1>
@@ -36,3 +38,4 @@
     <ProductForm onsubmit={handleSubmit} {loading} />
   </Card>
 </div>
+</AuthGuard>

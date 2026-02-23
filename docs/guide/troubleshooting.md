@@ -241,21 +241,20 @@ var order = await mediator.InvokeAsync<Order>(new CreateOrder(...));
 **Symptom:** Calls go through DI lookup instead of direct dispatch.
 
 **Causes:**
-1. Interceptors disabled via `MediatorDisableInterceptors`
+1. Interceptors disabled via `DisableInterceptors = true` in `[assembly: MediatorConfiguration]`
 2. Cross-assembly calls (interceptors only work within the same assembly)
 3. C# language version below 11
 
 **Solutions:**
+```csharp
+// Ensure interceptors are enabled (default)
+[assembly: MediatorConfiguration(DisableInterceptors = false)]
+```
+
 ```xml
 <PropertyGroup>
-    <!-- Ensure interceptors are enabled -->
-    <MediatorDisableInterceptors>false</MediatorDisableInterceptors>
-
     <!-- Ensure C# 11+ for interceptors -->
     <LangVersion>preview</LangVersion>
-
-    <!-- Required for interceptors -->
-    <InterceptorsNamespaces>$(InterceptorsNamespaces);Foundatio.Mediator</InterceptorsNamespaces>
 </PropertyGroup>
 ```
 

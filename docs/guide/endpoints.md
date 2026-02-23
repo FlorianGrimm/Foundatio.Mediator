@@ -223,12 +223,13 @@ Properties:
 
 ### Global Default
 
-Set a default auth requirement for all endpoints:
+Set a default auth requirement for all endpoints using the assembly attribute:
 
-```xml
-<PropertyGroup>
-    <MediatorEndpointRequireAuth>true</MediatorEndpointRequireAuth>
-</PropertyGroup>
+```csharp
+[assembly: MediatorConfiguration(
+    EndpointDiscovery = EndpointDiscovery.All,
+    EndpointRequireAuth = true
+)]
 ```
 
 ### Category Level
@@ -254,16 +255,14 @@ public Task<Result> HandleAsync(DeleteProduct command) { ... }
 
 ## Discovery Modes
 
-Control which handlers generate endpoints:
+Control which handlers generate endpoints using the assembly attribute:
 
-### All Mode (Default)
+### All Mode
 
 All handlers with valid endpoint info generate endpoints:
 
-```xml
-<PropertyGroup>
-    <MediatorEndpointDiscovery>All</MediatorEndpointDiscovery>
-</PropertyGroup>
+```csharp
+[assembly: MediatorConfiguration(EndpointDiscovery = EndpointDiscovery.All)]
 ```
 
 Use `[HandlerEndpoint(Exclude = true)]` to opt out specific handlers.
@@ -272,20 +271,23 @@ Use `[HandlerEndpoint(Exclude = true)]` to opt out specific handlers.
 
 Only handlers with `[HandlerEndpoint]` attribute generate endpoints:
 
-```xml
-<PropertyGroup>
-    <MediatorEndpointDiscovery>Explicit</MediatorEndpointDiscovery>
-</PropertyGroup>
+```csharp
+[assembly: MediatorConfiguration(EndpointDiscovery = EndpointDiscovery.Explicit)]
 ```
+
+### None Mode (Default)
+
+No endpoints are generated. This is the default when `EndpointDiscovery` is not set.
 
 ## Project Name Configuration
 
-Control the generated extension method name with `MediatorProjectName`:
+Control the generated extension method name with the `ProjectName` property on `MediatorConfiguration`:
 
-```xml
-<PropertyGroup>
-    <MediatorProjectName>Products</MediatorProjectName>
-</PropertyGroup>
+```csharp
+[assembly: MediatorConfiguration(
+    ProjectName = "Products",
+    EndpointDiscovery = EndpointDiscovery.All
+)]
 ```
 
 This generates:
@@ -300,7 +302,11 @@ Without this setting, the assembly name is used (with dots/dashes converted to u
 For a handler like this:
 
 ```csharp
-[HandlerCategory("Products", RoutePrefix = "/api/products")]
+[assembly: MediatorConfiguration(
+    EndpointDiscovery = EndpointDiscovery.All
+)]
+
+[HandlerCategory("Products")]
 public class ProductHandler
 {
     /// <summary>
@@ -322,7 +328,8 @@ public static class MediatorEndpointExtensions_Products
 {
     public static IEndpointRouteBuilder MapProductsEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        var productsGroup = endpoints.MapGroup("/api/products").WithTags("Products");
+        var rootGroup = endpoints.MapGroup("/api");
+        var productsGroup = rootGroup.MapGroup("/products").WithTags("Products");
 
         // POST /api/products - CreateProduct
         productsGroup.MapPost("/", async ([FromBody] CreateProduct message,
@@ -332,7 +339,8 @@ public static class MediatorEndpointExtensions_Products
             return MediatorEndpointResultMapper_Products.ToHttpResult(result);
         })
         .WithName("CreateProduct")
-        .WithSummary("Creates a new product");
+        .WithSummary("Creates a new product")
+        .Produces<Product>(201);
 
         // GET /api/products/{productId} - GetProduct
         productsGroup.MapGet("/{productId}", (string productId,
@@ -343,7 +351,8 @@ public static class MediatorEndpointExtensions_Products
             return MediatorEndpointResultMapper_Products.ToHttpResult(result);
         })
         .WithName("GetProduct")
-        .WithSummary("Gets a product by ID");
+        .WithSummary("Gets a product by ID")
+        .Produces<Product>(200);
 
         return endpoints;
     }
@@ -361,8 +370,9 @@ Handlers for event/notification types are automatically excluded from endpoint g
 ### Endpoints Not Generated
 
 1. Ensure your project references ASP.NET Core (has `Microsoft.AspNetCore.Routing`)
-2. Check `MediatorEndpointDiscovery` setting - in `Explicit` mode, handlers need `[HandlerEndpoint]`
-3. Verify the handler isn't excluded via `[HandlerEndpoint(Exclude = true)]`
+2. Check `[assembly: MediatorConfiguration(EndpointDiscovery = ...)]` - default is `None` (no endpoints). Set to `All` or `Explicit`.
+3. In `Explicit` mode, handlers need `[HandlerEndpoint]`
+4. Verify the handler isn't excluded via `[HandlerEndpoint(Exclude = true)]`
 
 ### XML Summaries Not Appearing
 

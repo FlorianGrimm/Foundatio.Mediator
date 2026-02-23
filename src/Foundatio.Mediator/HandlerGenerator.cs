@@ -1150,7 +1150,7 @@ internal static class HandlerGenerator
             // Has constructor dependencies - cache the instance after first creation
             // This is safe when lifetime is None (default) because the middleware will be long-lived
             // and dependencies are resolved once. If dependencies are scoped, user should use
-            // [Middleware(Lifetime = Scoped)] or MediatorDefaultMiddlewareLifetime=Scoped.
+            // [Middleware(Lifetime = Scoped)] or MediatorConfiguration MiddlewareLifetime=Scoped.
             else
             {
                 source.AppendLine()

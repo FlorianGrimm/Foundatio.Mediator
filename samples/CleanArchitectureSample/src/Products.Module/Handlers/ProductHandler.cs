@@ -1,6 +1,7 @@
 using Common.Module;
 using Common.Module.Events;
 using Foundatio.Mediator;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Logging;
 using Products.Module.Data;
 using Products.Module.Domain;
@@ -13,7 +14,7 @@ namespace Products.Module.Handlers;
 /// Following Clean Architecture, this handler orchestrates use cases
 /// and delegates persistence to the IProductRepository abstraction.
 /// </summary>
-[HandlerCategory("Products", RoutePrefix = "/api/products")]
+[HandlerCategory("Products")]
 public class ProductHandler(IProductRepository repository)
 {
     /// <summary>
@@ -38,8 +39,9 @@ public class ProductHandler(IProductRepository repository)
     }
 
     /// <summary>
-    /// Gets a product by ID
+    /// Gets a product by ID (anonymous - public catalog)
     /// </summary>
+    [AllowAnonymous]
     public async Task<Result<Product>> HandleAsync(GetProduct query, CancellationToken cancellationToken)
     {
         var product = await repository.GetByIdAsync(query.ProductId, cancellationToken);
@@ -51,8 +53,9 @@ public class ProductHandler(IProductRepository repository)
     }
 
     /// <summary>
-    /// Gets all products
+    /// Gets all products (anonymous - public catalog)
     /// </summary>
+    [AllowAnonymous]
     public async Task<Result<List<Product>>> HandleAsync(GetProducts query, CancellationToken cancellationToken)
     {
         var products = await repository.GetAllAsync(cancellationToken);

@@ -351,15 +351,13 @@ services.AddTransient<ExpensiveHandler>();
 
 ### Automatic DI Registration
 
-Use MSBuild property to auto-register handlers:
+Use the assembly attribute to auto-register handlers:
 
-```xml
-<PropertyGroup>
-    <MediatorDefaultHandlerLifetime>Scoped</MediatorDefaultHandlerLifetime>
-</PropertyGroup>
+```csharp
+[assembly: MediatorConfiguration(HandlerLifetime = MediatorLifetime.Scoped)]
 ```
 
-Options: `None` (default), `Singleton`, `Scoped`, `Transient`
+Options: `Default` (default), `Singleton`, `Scoped`, `Transient`
 
 ## Handler Discovery Rules
 
@@ -576,13 +574,11 @@ public class NotificationService
 
 If you prefer explicit handler declaration over naming conventions, you can disable conventional discovery entirely:
 
-```xml
-<PropertyGroup>
-    <MediatorDisableConventionalDiscovery>true</MediatorDisableConventionalDiscovery>
-</PropertyGroup>
+```csharp
+[assembly: MediatorConfiguration(HandlerDiscovery = HandlerDiscovery.Explicit)]
 ```
 
-When disabled, only handlers that implement `IHandler` or have the `[Handler]` attribute are discovered. Classes with names ending in `Handler` or `Consumer` will not be automatically discovered.
+When set to `Explicit`, only handlers that implement `IHandler` or have the `[Handler]` attribute are discovered. Classes with names ending in `Handler` or `Consumer` will not be automatically discovered.
 
 ## Handler Execution Order
 

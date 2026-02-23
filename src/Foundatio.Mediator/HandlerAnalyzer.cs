@@ -217,7 +217,8 @@ internal static class HandlerAnalyzer
                 handlerMethod,
                 messageType as INamedTypeSymbol,
                 xmlDocSummary,
-                context.SemanticModel.Compilation);
+                context.SemanticModel.Compilation,
+                handlerMethod.ReturnType);
 
             // Extract handler-specific middleware references from [UseMiddleware] and custom attributes
             var handlerMiddlewareRefs = ExtractHandlerMiddlewareReferences(
@@ -432,7 +433,8 @@ internal static class HandlerAnalyzer
         IMethodSymbol handlerMethod,
         INamedTypeSymbol? messageType,
         string? xmlDocSummary,
-        Compilation compilation)
+        Compilation compilation,
+        ITypeSymbol returnType)
     {
         if (messageType == null)
             return null;
@@ -511,6 +513,12 @@ internal static class HandlerAnalyzer
         var tags = GetStringArrayProperty(methodEndpointAttr, "Tags") ??
                    GetStringArrayProperty(classEndpointAttr, "Tags");
 
+        // Check for [AllowAnonymous] on method or class
+        var allowAnonymous = handlerMethod.GetAttributes()
+            .Any(a => a.AttributeClass?.ToDisplayString() == WellKnownTypes.AllowAnonymousAttribute)
+            || classSymbol.GetAttributes()
+            .Any(a => a.AttributeClass?.ToDisplayString() == WellKnownTypes.AllowAnonymousAttribute);
+
         // Auth configuration (method -> class -> category)
         var requireAuth = GetBoolProperty(methodEndpointAttr, "RequireAuth") ??
                           GetBoolProperty(classEndpointAttr, "RequireAuth") ??
@@ -534,6 +542,15 @@ internal static class HandlerAnalyzer
         var allPolicies = policy != null
             ? policies.Prepend(policy).Distinct().ToArray()
             : policies;
+
+        // Extract endpoint filters (method -> class -> merge; category is separate)
+        var methodFilters = GetTypeArrayProperty(methodEndpointAttr, "Filters");
+        var classFilters = GetTypeArrayProperty(classEndpointAttr, "Filters");
+        var endpointFilters = (methodFilters ?? []).Concat(classFilters ?? []).Distinct().ToArray();
+        var categoryFilters = GetTypeArrayProperty(categoryAttr, "Filters") ?? [];
+
+        // Extract ProducesType from return type for auto Produces<T>() generation
+        string? producesType = ExtractProducesType(returnType, compilation);
 
         // Analyze message type for parameters
         var (routeParams, queryParams, supportsAsParameters) = AnalyzeMessageParameters(messageType, httpMethod, compilation);
@@ -562,9 +579,14 @@ internal static class HandlerAnalyzer
             BindFromBody = bindFromBody,
             SupportsAsParameters = supportsAsParameters,
             GenerateEndpoint = true,
+            HasExplicitEndpointAttribute = methodEndpointAttr != null || classEndpointAttr != null,
+            AllowAnonymous = allowAnonymous,
             RequireAuth = requireAuth,
             Roles = new(roles),
             Policies = new(allPolicies),
+            Filters = new(endpointFilters),
+            CategoryFilters = new(categoryFilters),
+            ProducesType = producesType,
         };
     }
 
@@ -852,6 +874,67 @@ internal static class HandlerAnalyzer
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Gets a Type[] property value from an attribute as fully qualified type name strings.
+    /// </summary>
+    private static string[]? GetTypeArrayProperty(AttributeData? attr, string propertyName)
+    {
+        if (attr == null)
+            return null;
+
+        var arg = attr.NamedArguments.FirstOrDefault(na => na.Key == propertyName);
+        if (arg.Value.IsNull)
+            return null;
+
+        if (arg.Value.Kind == TypedConstantKind.Array)
+        {
+            return arg.Value.Values
+                .Where(v => v.Value is INamedTypeSymbol)
+                .Select(v => ((INamedTypeSymbol)v.Value!).ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat))
+                .ToArray();
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Extracts the Produces type from a handler return type.
+    /// For Result&lt;T&gt; returns the fully qualified name of T.
+    /// For non-Result non-void returns the full return type name.
+    /// Returns null for void handlers or non-generic Result.
+    /// </summary>
+    private static string? ExtractProducesType(ITypeSymbol returnType, Compilation compilation)
+    {
+        // Unwrap Task/ValueTask
+        var unwrapped = returnType.UnwrapTask(compilation);
+
+        // Unwrap nullable
+        unwrapped = unwrapped.UnwrapNullable(compilation);
+
+        // Check for void
+        if (unwrapped.IsVoid(compilation) || unwrapped.IsTask(compilation))
+            return null;
+
+        // Check for tuple (cascading messages) - use the first item as the result type
+        if (unwrapped is INamedTypeSymbol { IsTupleType: true } tupleType && tupleType.TupleElements.Length > 0)
+        {
+            unwrapped = tupleType.TupleElements[0].Type;
+        }
+
+        // Check for Result<T>
+        if (unwrapped.IsResult(compilation) && unwrapped is INamedTypeSymbol { IsGenericType: true, TypeArguments.Length: > 0 } resultType)
+        {
+            return resultType.TypeArguments[0].ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        }
+
+        // Non-generic Result (no inner type)
+        if (unwrapped.IsResult(compilation))
+            return null;
+
+        // Direct return type (not Result, not void)
+        return unwrapped.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
     }
 
     /// <summary>

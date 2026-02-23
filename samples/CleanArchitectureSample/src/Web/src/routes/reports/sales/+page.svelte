@@ -1,6 +1,7 @@
 <script lang="ts">
   import { reportsApi } from '$lib/api';
   import { Card, Button, Input, Spinner, Alert } from '$lib/components/ui';
+  import { AuthGuard } from '$lib/components/layout';
 
   let startDate = $state('');
   let endDate = $state('');
@@ -30,6 +31,7 @@
   <title>Sales Report - Clean Architecture Sample</title>
 </svelte:head>
 
+<AuthGuard>
 <div class="space-y-6">
   <div class="flex justify-between items-center">
     <div>
@@ -111,3 +113,4 @@
     <Alert type="error" message={error.message || 'Failed to load sales report'} />
   {/await}
 </div>
+</AuthGuard>

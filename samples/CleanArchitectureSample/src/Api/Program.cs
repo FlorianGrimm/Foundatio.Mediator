@@ -1,6 +1,9 @@
+using System.Security.Claims;
 using Common.Module;
 using Common.Module.Events;
 using Foundatio.Mediator;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Orders.Module;
 using Orders.Module.Messages;
 using Products.Module;
@@ -15,6 +18,29 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();
 builder.Services.AddSignalR();
+
+// Simple cookie authentication for the sample
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.Cookie.Name = "ModularMonolith.Auth";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SameSite = SameSiteMode.Strict;
+        options.ExpireTimeSpan = TimeSpan.FromHours(8);
+        options.SlidingExpiration = true;
+        // Return 401 JSON instead of redirecting to a login page
+        options.Events.OnRedirectToLogin = context =>
+        {
+            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return Task.CompletedTask;
+        };
+        options.Events.OnRedirectToAccessDenied = context =>
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            return Task.CompletedTask;
+        };
+    });
+builder.Services.AddAuthorization();
 
 // Add Foundatio.Mediator with assemblies from all modules
 builder.Services.AddMediator(c =>
@@ -48,10 +74,63 @@ app.MapScalarApiReference();
 
 app.UseHttpsRedirection();
 
+app.UseAuthentication();
+app.UseAuthorization();
+
+// --- Demo auth endpoints (hardcoded users for the sample) ---
+
+// Demo users: admin / admin, user / user
+var demoUsers = new Dictionary<string, (string Password, string DisplayName, string Role)>(StringComparer.OrdinalIgnoreCase)
+{
+    ["admin"] = ("admin", "Alice Admin", "Admin"),
+    ["user"]  = ("user",  "Bob User",   "User"),
+};
+
+app.MapPost("/api/auth/login", async (HttpContext http, LoginRequest request) =>
+{
+    if (!demoUsers.TryGetValue(request.Username, out var user) || user.Password != request.Password)
+        return Results.Problem("Invalid username or password.", statusCode: 401);
+
+    var claims = new List<Claim>
+    {
+        new(ClaimTypes.Name, user.DisplayName),
+        new(ClaimTypes.NameIdentifier, request.Username),
+        new(ClaimTypes.Role, user.Role),
+    };
+
+    var identity  = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+    var principal = new ClaimsPrincipal(identity);
+
+    await http.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
+
+    return Results.Ok(new UserInfo(user.DisplayName, request.Username, user.Role));
+}).AllowAnonymous();
+
+app.MapPost("/api/auth/logout", async (HttpContext http) =>
+{
+    await http.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+    return Results.Ok();
+}).AllowAnonymous();
+
+app.MapGet("/api/auth/me", (HttpContext http) =>
+{
+    if (http.User.Identity?.IsAuthenticated != true)
+        return Results.Unauthorized();
+
+    var displayName = http.User.Identity.Name ?? "unknown";
+    var username = http.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "unknown";
+    var role = http.User.FindFirstValue(ClaimTypes.Role) ?? "User";
+
+    return Results.Ok(new UserInfo(displayName, username, role));
+}).AllowAnonymous();
+
 // Map SignalR hub for real-time events
 app.MapHub<EventHub>("/hubs/events");
 
 // Map module endpoints - each module exposes its own API endpoints
+// All generated endpoints now require authentication via [assembly: MediatorConfiguration(EndpointRequireAuth = true)]
+// Handlers marked with [AllowAnonymous] (e.g., HealthHandler) opt out of auth
+app.MapCommonEndpoints();
 app.MapOrdersEndpoints();
 app.MapProductsEndpoints();
 app.MapReportsEndpoints();
@@ -60,3 +139,10 @@ app.MapReportsEndpoints();
 app.MapFallbackToFile("/index.html");
 
 app.Run();
+
+// --- DTOs for auth endpoints ---
+
+record LoginRequest(string Username, string Password);
+record UserInfo(string DisplayName, string Username, string Role);
+
+

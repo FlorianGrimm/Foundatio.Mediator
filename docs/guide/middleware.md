@@ -693,10 +693,8 @@ public class SimpleMiddleware
 
 Set a default lifetime for all middleware:
 
-```xml
-<PropertyGroup>
-    <MediatorDefaultMiddlewareLifetime>Scoped</MediatorDefaultMiddlewareLifetime>
-</PropertyGroup>
+```csharp
+[assembly: MediatorConfiguration(MiddlewareLifetime = MediatorLifetime.Scoped)]
 ```
 
 ## Middleware Discovery

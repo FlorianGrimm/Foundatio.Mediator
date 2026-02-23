@@ -66,7 +66,7 @@ Middleware lifetime follows the same rules as handler lifetime:
 
 ### Important: Default Behavior When Lifetime Not Specified
 
-If you don't explicitly set a lifetime (via `[Handler(Lifetime = ...)]` or `MediatorDefaultHandlerLifetime`), the handler instance will be cached:
+If you don't explicitly set a lifetime (via `[Handler(Lifetime = ...)]` or `HandlerLifetime` in `[assembly: MediatorConfiguration]`), the handler instance will be cached:
 
 - **No constructor parameters**: Instantiated with `new()` and cached forever
 - **With constructor parameters**: Created via `ActivatorUtilities.CreateInstance` and cached - constructor dependencies are resolved once and reused
@@ -117,23 +117,23 @@ There are two ways to control handler lifetime:
 public class OrderHandler { /* ... */ }
 ```
 
-**2. Using `MediatorDefaultHandlerLifetime` MSBuild property** (see below)
+**2. Using the `HandlerLifetime` property on `MediatorConfiguration`** (see below)
 
-### Automatic Handler Registration with MSBuild
+### Automatic Handler Registration with Assembly Attribute
 
-You can automatically register all handlers in your project with a specific lifetime using the `MediatorDefaultHandlerLifetime` MSBuild property:
+You can automatically register all handlers in your project with a specific lifetime using the `HandlerLifetime` property on `[assembly: MediatorConfiguration]`:
 
-```xml
-<PropertyGroup>
-    <MediatorDefaultHandlerLifetime>Scoped</MediatorDefaultHandlerLifetime>
-</PropertyGroup>
+```csharp
+using Foundatio.Mediator;
+
+[assembly: MediatorConfiguration(HandlerLifetime = MediatorLifetime.Scoped)]
 ```
 
 **Supported Values:**
 
-- `Scoped` - Handlers registered as scoped services
-- `Transient` - Handlers registered as transient services
-- `Singleton` - Handlers registered as singleton services
+- `MediatorLifetime.Scoped` - Handlers registered as scoped services
+- `MediatorLifetime.Transient` - Handlers registered as transient services
+- `MediatorLifetime.Singleton` - Handlers registered as singleton services
 
 **What this does:**
 
@@ -144,18 +144,11 @@ You can automatically register all handlers in your project with a specific life
 
 **Example usage:**
 
-```xml
-<!-- In your .csproj file -->
-<Project Sdk="Microsoft.NET.Sdk.Web">
+```csharp
+using Foundatio.Mediator;
 
-  <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <MediatorDefaultHandlerLifetime>Scoped</MediatorDefaultHandlerLifetime>
-  </PropertyGroup>
-
-  <PackageReference Include="Foundatio.Mediator" Version="1.0.0" />
-
-</Project>
+// In any .cs file in your project
+[assembly: MediatorConfiguration(HandlerLifetime = MediatorLifetime.Scoped)]
 ```
 
 With this configuration, all your handlers will be automatically registered as scoped services:
@@ -187,7 +180,7 @@ builder.Services.AddScoped<IOrderRepository, OrderRepository>();
 Individual handlers can override the project-level default lifetime using the `[Handler]` attribute:
 
 ```csharp
-// Uses project-level MediatorDefaultHandlerLifetime
+// Uses project-level HandlerLifetime from [assembly: MediatorConfiguration]
 public class DefaultHandler
 {
     public Task HandleAsync(MyMessage msg) => Task.CompletedTask;
@@ -225,7 +218,7 @@ public class ScopedHandler
 ```
 
 **Available `MediatorLifetime` values:**
-- `MediatorLifetime.Default` - Use project-level `MediatorDefaultHandlerLifetime`
+- `MediatorLifetime.Default` - Use project-level `HandlerLifetime` from `[assembly: MediatorConfiguration]`
 - `MediatorLifetime.Transient` - New instance per request
 - `MediatorLifetime.Scoped` - Same instance within a scope
 - `MediatorLifetime.Singleton` - Single instance for application lifetime
@@ -360,14 +353,12 @@ public class LoggingMiddleware { /* ... */ }
 public class ValidationMiddleware { /* ... */ }
 ```
 
-### Project-Level Default with MSBuild
+### Project-Level Default with Assembly Attribute
 
-Set a default lifetime for all middleware using `MediatorDefaultMiddlewareLifetime`:
+Set a default lifetime for all middleware using `MiddlewareLifetime` in `[assembly: MediatorConfiguration]`:
 
-```xml
-<PropertyGroup>
-    <MediatorDefaultMiddlewareLifetime>Scoped</MediatorDefaultMiddlewareLifetime>
-</PropertyGroup>
+```csharp
+[assembly: MediatorConfiguration(MiddlewareLifetime = MediatorLifetime.Scoped)]
 ```
 
 ## Service Location Pattern

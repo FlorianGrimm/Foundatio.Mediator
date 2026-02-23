@@ -12,7 +12,7 @@ public class Mediator : IMediator, IServiceProvider
     private readonly IServiceProvider _serviceProvider;
 
     /// <summary>
-    /// The notification publisher used by all Mediator instances. Set from MSBuild MediatorNotificationPublisher configuration.
+    /// The notification publisher used by all Mediator instances. Set from MediatorConfiguration NotificationPublisher setting.
     /// </summary>
     public static INotificationPublisher NotificationPublisher { get; set; } = new ForeachAwaitPublisher();
 

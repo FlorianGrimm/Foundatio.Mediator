@@ -10,13 +10,14 @@ public class InterceptorsToggleTests(ITestOutputHelper output) : GeneratorTestBa
             using System.Threading.Tasks;
             using Foundatio.Mediator;
 
+            [assembly: MediatorConfiguration(DisableInterceptors = true)]
+
             public record Msg;
             public class MsgHandler { public void Handle(Msg m) { } }
             public static class Calls { public static void C(IMediator m) { m.Invoke(new Msg()); } }
             """;
 
-        var opts = CreateOptions(("build_property.MediatorDisableInterceptors", "true"));
-        var (_, _, trees) = RunGenerator(src, [new MediatorGenerator()], opts);
+        var (_, _, trees) = RunGenerator(src, [new MediatorGenerator()]);
 
         Assert.DoesNotContain(trees, t => t.HintName == "InterceptsLocationAttribute.g.cs");
         var wrapper = trees.First(t => t.HintName.EndsWith("_Handler.g.cs"));
@@ -36,8 +37,7 @@ public class InterceptorsToggleTests(ITestOutputHelper output) : GeneratorTestBa
             public static class Calls { public static void C(IMediator m) { m.Invoke(new Msg()); } }
             """;
 
-        var opts = CreateOptions(("build_property.MediatorDisableInterceptors", "false"));
-        var (_, _, trees) = RunGenerator(src, [new MediatorGenerator()], opts);
+        var (_, _, trees) = RunGenerator(src, [new MediatorGenerator()]);
 
         Assert.Contains(trees, t => t.HintName == "_InterceptsLocationAttribute.g.cs");
         var wrapper = trees.First(t => t.HintName.EndsWith("_Handler.g.cs"));

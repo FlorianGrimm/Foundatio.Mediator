@@ -1,0 +1,564 @@
+using Microsoft.CodeAnalysis;
+
+namespace Foundatio.Mediator.Tests;
+
+public class EndpointGenerationTests(ITestOutputHelper output) : GeneratorTestBase(output)
+{
+    private static readonly MediatorGenerator Gen = new();
+
+    /// <summary>
+    /// Helper to create ASP.NET Core metadata references so the endpoint generator activates.
+    /// </summary>
+    private static MetadataReference[] GetAspNetCoreReferences()
+    {
+        var aspNetCorePath = GetAspNetCoreAssemblyPath();
+        if (aspNetCorePath == null)
+            return [];
+
+        var assemblies = new[]
+        {
+            "Microsoft.AspNetCore.dll",
+            "Microsoft.AspNetCore.Authorization.dll",
+            "Microsoft.AspNetCore.Http.Abstractions.dll",
+            "Microsoft.AspNetCore.Http.dll",
+            "Microsoft.AspNetCore.Routing.dll",
+            "Microsoft.AspNetCore.Routing.Abstractions.dll",
+            "Microsoft.AspNetCore.Mvc.Core.dll",
+            "Microsoft.AspNetCore.OpenApi.dll",
+            "Microsoft.Extensions.Primitives.dll",
+        };
+
+        var refs = new List<MetadataReference>();
+        foreach (var assembly in assemblies)
+        {
+            var path = Path.Combine(aspNetCorePath, assembly);
+            if (File.Exists(path))
+                refs.Add(MetadataReference.CreateFromFile(path));
+        }
+
+        return refs.ToArray();
+    }
+
+    private static string? GetAspNetCoreAssemblyPath()
+    {
+        // Find the ASP.NET Core shared framework directory
+        var dotnetRoot = Environment.GetEnvironmentVariable("DOTNET_ROOT")
+            ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "dotnet");
+
+        var aspNetCorePath = Path.Combine(dotnetRoot, "shared", "Microsoft.AspNetCore.App");
+        if (!Directory.Exists(aspNetCorePath))
+            return null;
+
+        // Get the latest version directory
+        var latestVersion = Directory.GetDirectories(aspNetCorePath)
+            .OrderByDescending(d => d)
+            .FirstOrDefault();
+
+        return latestVersion;
+    }
+
+    [Fact]
+    public void GlobalRoutePrefix_GeneratesNestedMapGroup()
+    {
+        var source = """
+            using Foundatio.Mediator;
+
+            [assembly: MediatorConfiguration(
+                EndpointRoutePrefix = "/api",
+                EndpointDiscovery = EndpointDiscovery.All
+            )]
+
+            public record GetWidget(string Id);
+
+            [HandlerCategory("Widgets")]
+            public class WidgetHandler
+            {
+                public string Handle(GetWidget query) => "widget";
+            }
+            """;
+
+        var refs = GetAspNetCoreReferences();
+        if (refs.Length == 0)
+        {
+            return;
+        }
+
+        var (_, _, trees) = RunGenerator(source, [Gen], additionalReferences: refs);
+        var endpointSource = trees.FirstOrDefault(t => t.HintName == "_MediatorEndpoints.g.cs").Source;
+
+        Assert.NotNull(endpointSource);
+        Assert.Contains("MapGroup(\"/api\")", endpointSource);
+        Assert.Contains("rootGroup.MapGroup(\"/widgets\")", endpointSource);
+        Assert.Contains(".WithTags(\"Widgets\")", endpointSource);
+    }
+
+    [Fact]
+    public void GlobalFilters_EmittedOnRootGroup()
+    {
+        var source = """
+            using Foundatio.Mediator;
+            using Microsoft.AspNetCore.Http;
+
+            [assembly: MediatorConfiguration(
+                EndpointRoutePrefix = "/api",
+                EndpointDiscovery = EndpointDiscovery.All,
+                EndpointFilters = new[] { typeof(MyGlobalFilter) }
+            )]
+
+            public class MyGlobalFilter : IEndpointFilter
+            {
+                public ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next) => next(context);
+            }
+
+            public record GetItem(string Id);
+
+            public class ItemHandler
+            {
+                public string Handle(GetItem query) => "item";
+            }
+            """;
+
+        var refs = GetAspNetCoreReferences();
+        if (refs.Length == 0) return;
+
+        var (_, _, trees) = RunGenerator(source, [Gen], additionalReferences: refs);
+        var endpointSource = trees.FirstOrDefault(t => t.HintName == "_MediatorEndpoints.g.cs").Source;
+
+        Assert.NotNull(endpointSource);
+        Assert.Contains("AddEndpointFilter<global::MyGlobalFilter>()", endpointSource);
+        Assert.Contains("rootGroup.AddEndpointFilter<global::MyGlobalFilter>()", endpointSource);
+    }
+
+    [Fact]
+    public void CategoryFilters_EmittedOnCategoryGroup()
+    {
+        var source = """
+            using Foundatio.Mediator;
+            using Microsoft.AspNetCore.Http;
+
+            [assembly: MediatorConfiguration(EndpointDiscovery = EndpointDiscovery.All)]
+
+            public class CategoryFilter : IEndpointFilter
+            {
+                public ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next) => next(context);
+            }
+
+            public record GetThing(string Id);
+
+            [HandlerCategory("Things", Filters = new[] { typeof(CategoryFilter) })]
+            public class ThingHandler
+            {
+                public string Handle(GetThing query) => "thing";
+            }
+            """;
+
+        var refs = GetAspNetCoreReferences();
+        if (refs.Length == 0) return;
+
+        var (_, _, trees) = RunGenerator(source, [Gen], additionalReferences: refs);
+        var endpointSource = trees.FirstOrDefault(t => t.HintName == "_MediatorEndpoints.g.cs").Source;
+
+        Assert.NotNull(endpointSource);
+        Assert.Contains("thingsGroup.AddEndpointFilter<global::CategoryFilter>()", endpointSource);
+    }
+
+    [Fact]
+    public void EndpointFilters_EmittedOnIndividualRoute()
+    {
+        var source = """
+            using Foundatio.Mediator;
+            using Microsoft.AspNetCore.Http;
+
+            [assembly: MediatorConfiguration(EndpointDiscovery = EndpointDiscovery.All)]
+
+            public class AuditFilter : IEndpointFilter
+            {
+                public ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next) => next(context);
+            }
+
+            public record CreateFoo(string Name);
+
+            public class FooHandler
+            {
+                [HandlerEndpoint(Filters = new[] { typeof(AuditFilter) })]
+                public string Handle(CreateFoo command) => "created";
+            }
+            """;
+
+        var refs = GetAspNetCoreReferences();
+        if (refs.Length == 0) return;
+
+        var (_, _, trees) = RunGenerator(source, [Gen], additionalReferences: refs);
+        var endpointSource = trees.FirstOrDefault(t => t.HintName == "_MediatorEndpoints.g.cs").Source;
+
+        Assert.NotNull(endpointSource);
+        Assert.Contains(".AddEndpointFilter<global::AuditFilter>()", endpointSource);
+    }
+
+    [Fact]
+    public void ResultOfT_ProducesAutoGenerated_Post201()
+    {
+        var source = """
+            using Foundatio.Mediator;
+
+            [assembly: MediatorConfiguration(EndpointDiscovery = EndpointDiscovery.All)]
+
+            public record CreateOrder(string Name);
+            public record OrderView(string Id, string Name);
+
+            public class OrderHandler
+            {
+                public Result<OrderView> Handle(CreateOrder command) => new OrderView("1", command.Name);
+            }
+            """;
+
+        var refs = GetAspNetCoreReferences();
+        if (refs.Length == 0) return;
+
+        var (_, _, trees) = RunGenerator(source, [Gen], additionalReferences: refs);
+        var endpointSource = trees.FirstOrDefault(t => t.HintName == "_MediatorEndpoints.g.cs").Source;
+
+        Assert.NotNull(endpointSource);
+        // POST should produce 201
+        Assert.Contains(".Produces<global::OrderView>(201)", endpointSource);
+    }
+
+    [Fact]
+    public void ResultOfT_ProducesAutoGenerated_Get200()
+    {
+        var source = """
+            using Foundatio.Mediator;
+
+            [assembly: MediatorConfiguration(EndpointDiscovery = EndpointDiscovery.All)]
+
+            public record GetOrder(string Id);
+            public record OrderView(string Id, string Name);
+
+            public class OrderHandler
+            {
+                public Result<OrderView> Handle(GetOrder query) => new OrderView("1", "test");
+            }
+            """;
+
+        var refs = GetAspNetCoreReferences();
+        if (refs.Length == 0) return;
+
+        var (_, _, trees) = RunGenerator(source, [Gen], additionalReferences: refs);
+        var endpointSource = trees.FirstOrDefault(t => t.HintName == "_MediatorEndpoints.g.cs").Source;
+
+        Assert.NotNull(endpointSource);
+        // GET should produce 200
+        Assert.Contains(".Produces<global::OrderView>(200)", endpointSource);
+    }
+
+    [Fact]
+    public void VoidHandler_NoProducesGenerated()
+    {
+        var source = """
+            using Foundatio.Mediator;
+
+            [assembly: MediatorConfiguration(EndpointDiscovery = EndpointDiscovery.All)]
+
+            public record DeleteItem(string Id);
+
+            public class ItemHandler
+            {
+                public void Handle(DeleteItem command) { }
+            }
+            """;
+
+        var refs = GetAspNetCoreReferences();
+        if (refs.Length == 0) return;
+
+        var (_, _, trees) = RunGenerator(source, [Gen], additionalReferences: refs);
+        var endpointSource = trees.FirstOrDefault(t => t.HintName == "_MediatorEndpoints.g.cs").Source;
+
+        Assert.NotNull(endpointSource);
+        Assert.DoesNotContain(".Produces<", endpointSource);
+    }
+
+    [Fact]
+    public void DiscoveryExplicit_OnlyMarkedHandlersGenerateEndpoints()
+    {
+        var source = """
+            using Foundatio.Mediator;
+
+            [assembly: MediatorConfiguration(EndpointDiscovery = EndpointDiscovery.Explicit)]
+
+            public record GetAlpha(string Id);
+            public record GetBeta(string Id);
+
+            public class TestHandler
+            {
+                [HandlerEndpoint]
+                public string Handle(GetAlpha query) => "alpha";
+
+                public string Handle(GetBeta query) => "beta";
+            }
+            """;
+
+        var refs = GetAspNetCoreReferences();
+        if (refs.Length == 0) return;
+
+        var (_, _, trees) = RunGenerator(source, [Gen], additionalReferences: refs);
+        var endpointSource = trees.FirstOrDefault(t => t.HintName == "_MediatorEndpoints.g.cs").Source;
+
+        Assert.NotNull(endpointSource);
+        Assert.Contains("GetAlpha", endpointSource);
+        Assert.DoesNotContain("GetBeta", endpointSource);
+    }
+
+    [Fact]
+    public void DiscoveryNone_NoEndpointsGenerated()
+    {
+        // No assembly attribute = default Discovery = None
+        var source = """
+            using Foundatio.Mediator;
+
+            public record GetItem(string Id);
+
+            public class ItemHandler
+            {
+                public string Handle(GetItem query) => "item";
+            }
+            """;
+
+        var refs = GetAspNetCoreReferences();
+        if (refs.Length == 0) return;
+
+        var (_, _, trees) = RunGenerator(source, [Gen], additionalReferences: refs);
+        var endpointSource = trees.FirstOrDefault(t => t.HintName == "_MediatorEndpoints.g.cs");
+
+        Assert.Null(endpointSource.Source);
+    }
+
+    [Fact]
+    public void AllThreeLevels_Filters_Applied()
+    {
+        var source = """
+            using Foundatio.Mediator;
+            using Microsoft.AspNetCore.Http;
+
+            [assembly: MediatorConfiguration(
+                EndpointRoutePrefix = "/api",
+                EndpointDiscovery = EndpointDiscovery.All,
+                EndpointFilters = new[] { typeof(GlobalFilter) }
+            )]
+
+            public class GlobalFilter : IEndpointFilter
+            {
+                public ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next) => next(context);
+            }
+            public class CategoryLevelFilter : IEndpointFilter
+            {
+                public ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next) => next(context);
+            }
+            public class EndpointLevelFilter : IEndpointFilter
+            {
+                public ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next) => next(context);
+            }
+
+            public record CreateBar(string Name);
+
+            [HandlerCategory("Bars", Filters = new[] { typeof(CategoryLevelFilter) })]
+            public class BarHandler
+            {
+                [HandlerEndpoint(Filters = new[] { typeof(EndpointLevelFilter) })]
+                public string Handle(CreateBar command) => "bar";
+            }
+            """;
+
+        var refs = GetAspNetCoreReferences();
+        if (refs.Length == 0) return;
+
+        var (_, _, trees) = RunGenerator(source, [Gen], additionalReferences: refs);
+        var endpointSource = trees.FirstOrDefault(t => t.HintName == "_MediatorEndpoints.g.cs").Source;
+
+        Assert.NotNull(endpointSource);
+        // Global filter on root group
+        Assert.Contains("rootGroup.AddEndpointFilter<global::GlobalFilter>()", endpointSource);
+        // Category filter on category group
+        Assert.Contains("barsGroup.AddEndpointFilter<global::CategoryLevelFilter>()", endpointSource);
+        // Endpoint filter on individual route
+        Assert.Contains(".AddEndpointFilter<global::EndpointLevelFilter>()", endpointSource);
+    }
+
+    [Fact]
+    public void GlobalRequireAuth_AppliedToRootGroup()
+    {
+        var source = """
+            using Foundatio.Mediator;
+
+            [assembly: MediatorConfiguration(
+                EndpointRoutePrefix = "/api",
+                EndpointDiscovery = EndpointDiscovery.All,
+                EndpointRequireAuth = true
+            )]
+
+            public record GetItem(string Id);
+
+            public class ItemHandler
+            {
+                public string Handle(GetItem query) => "item";
+            }
+            """;
+
+        var refs = GetAspNetCoreReferences();
+        if (refs.Length == 0) return;
+
+        var (_, _, trees) = RunGenerator(source, [Gen], additionalReferences: refs);
+        var endpointSource = trees.FirstOrDefault(t => t.HintName == "_MediatorEndpoints.g.cs").Source;
+
+        Assert.NotNull(endpointSource);
+        Assert.Contains("MapGroup(\"/api\").RequireAuthorization()", endpointSource);
+    }
+
+    [Fact]
+    public void CategoryRoutePrefixAutoDerivesFromName()
+    {
+        var source = """
+            using Foundatio.Mediator;
+
+            [assembly: MediatorConfiguration(
+                EndpointRoutePrefix = "/api",
+                EndpointDiscovery = EndpointDiscovery.All
+            )]
+
+            public record GetProduct(string Id);
+
+            [HandlerCategory("Products")]
+            public class ProductHandler
+            {
+                public string Handle(GetProduct query) => "product";
+            }
+            """;
+
+        var refs = GetAspNetCoreReferences();
+        if (refs.Length == 0) return;
+
+        var (_, _, trees) = RunGenerator(source, [Gen], additionalReferences: refs);
+        var endpointSource = trees.FirstOrDefault(t => t.HintName == "_MediatorEndpoints.g.cs").Source;
+
+        Assert.NotNull(endpointSource);
+        // Category name "Products" auto-derives to "/products"
+        Assert.Contains("MapGroup(\"/products\")", endpointSource);
+    }
+
+    [Fact]
+    public void AllowAnonymousOnMethod_EmitsAllowAnonymous()
+    {
+        var source = """
+            using Foundatio.Mediator;
+            using Microsoft.AspNetCore.Authorization;
+
+            [assembly: MediatorConfiguration(
+                EndpointRoutePrefix = "/api",
+                EndpointDiscovery = EndpointDiscovery.All,
+                EndpointRequireAuth = true
+            )]
+
+            public record GetPublicInfo();
+            public record GetSecretInfo();
+
+            public class InfoHandler
+            {
+                [AllowAnonymous]
+                public string Handle(GetPublicInfo query) => "public";
+
+                public string Handle(GetSecretInfo query) => "secret";
+            }
+            """;
+
+        var refs = GetAspNetCoreReferences();
+        if (refs.Length == 0) return;
+
+        var (_, _, trees) = RunGenerator(source, [Gen], additionalReferences: refs);
+        var endpointSource = trees.FirstOrDefault(t => t.HintName == "_MediatorEndpoints.g.cs").Source;
+
+        Assert.NotNull(endpointSource);
+        // Root group has RequireAuthorization
+        Assert.Contains(".RequireAuthorization()", endpointSource);
+        // The [AllowAnonymous] endpoint gets .AllowAnonymous()
+        Assert.Contains(".AllowAnonymous()", endpointSource);
+    }
+
+    [Fact]
+    public void AllowAnonymousOnClass_EmitsAllowAnonymousForAllEndpoints()
+    {
+        var source = """
+            using Foundatio.Mediator;
+            using Microsoft.AspNetCore.Authorization;
+
+            [assembly: MediatorConfiguration(
+                EndpointRoutePrefix = "/api",
+                EndpointDiscovery = EndpointDiscovery.All,
+                EndpointRequireAuth = true
+            )]
+
+            public record GetHealth();
+            public record GetStatus();
+
+            [AllowAnonymous]
+            public class PublicHandler
+            {
+                public string Handle(GetHealth query) => "healthy";
+                public string Handle(GetStatus query) => "ok";
+            }
+            """;
+
+        var refs = GetAspNetCoreReferences();
+        if (refs.Length == 0) return;
+
+        var (_, _, trees) = RunGenerator(source, [Gen], additionalReferences: refs);
+        var endpointSource = trees.FirstOrDefault(t => t.HintName == "_MediatorEndpoints.g.cs").Source;
+
+        Assert.NotNull(endpointSource);
+        // Root group has RequireAuthorization
+        Assert.Contains(".RequireAuthorization()", endpointSource);
+        // Both endpoints from the [AllowAnonymous] class should have .AllowAnonymous()
+        var count = endpointSource!.Split(".AllowAnonymous()").Length - 1;
+        Assert.Equal(2, count);
+    }
+
+    [Fact]
+    public void AllowAnonymous_OverridesGlobalRoles()
+    {
+        var source = """
+            using Foundatio.Mediator;
+            using Microsoft.AspNetCore.Authorization;
+
+            [assembly: MediatorConfiguration(
+                EndpointRoutePrefix = "/api",
+                EndpointDiscovery = EndpointDiscovery.All,
+                EndpointRequireAuth = true,
+                EndpointRoles = new[] { "Admin" }
+            )]
+
+            public record GetSecret();
+            public record GetPublicInfo();
+
+            public class SecretHandler
+            {
+                public string Handle(GetSecret query) => "secret";
+
+                [AllowAnonymous]
+                public string Handle(GetPublicInfo query) => "public";
+            }
+            """;
+
+        var refs = GetAspNetCoreReferences();
+        if (refs.Length == 0) return;
+
+        var (_, _, trees) = RunGenerator(source, [Gen], additionalReferences: refs);
+        var endpointSource = trees.FirstOrDefault(t => t.HintName == "_MediatorEndpoints.g.cs").Source;
+
+        Assert.NotNull(endpointSource);
+        // Root group has role-based auth
+        Assert.Contains("RequireRole(\"Admin\")", endpointSource);
+        // The [AllowAnonymous] endpoint gets .AllowAnonymous() and NOT an additional RequireAuthorization
+        Assert.Contains(".AllowAnonymous()", endpointSource);
+        // Only one endpoint has AllowAnonymous (GetPublicInfo), not GetSecret
+        var anonCount = endpointSource!.Split(".AllowAnonymous()").Length - 1;
+        Assert.Equal(1, anonCount);
+    }
+}

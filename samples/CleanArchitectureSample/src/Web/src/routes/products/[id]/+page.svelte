@@ -3,6 +3,7 @@
   import { goto } from '$app/navigation';
   import { productsApi } from '$lib/api';
   import { ProductForm } from '$lib/components/products';
+  import { AuthGuard } from '$lib/components/layout';
   import { Card, Spinner, Alert, Button } from '$lib/components/ui';
   import { toast } from '$lib/stores/toast.svelte';
   import type { UpdateProductRequest } from '$lib/types/product';
@@ -45,6 +46,7 @@
   <title>Edit Product - Clean Architecture Sample</title>
 </svelte:head>
 
+<AuthGuard>
 <div class="max-w-2xl">
   {#await productPromise}
     <div class="flex justify-center py-12">
@@ -76,3 +78,4 @@
     </div>
   {/await}
 </div>
+</AuthGuard>

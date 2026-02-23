@@ -1,5 +1,6 @@
 <script lang="ts">
   import { page } from '$app/stores';
+  import { auth } from '$lib/stores/auth.svelte';
 </script>
 
 <header class="bg-white shadow-sm border-b border-gray-200">
@@ -12,6 +13,7 @@
       </div>
 
       <nav class="hidden md:flex space-x-8">
+        <!-- Public nav links - always visible -->
         <a
           href="/"
           class="text-sm font-medium transition-colors {$page.url.pathname === '/'
@@ -21,14 +23,6 @@
           Dashboard
         </a>
         <a
-          href="/orders"
-          class="text-sm font-medium transition-colors {$page.url.pathname.startsWith('/orders')
-            ? 'text-blue-600'
-            : 'text-gray-500 hover:text-gray-900'}"
-        >
-          Orders
-        </a>
-        <a
           href="/products"
           class="text-sm font-medium transition-colors {$page.url.pathname.startsWith('/products')
             ? 'text-blue-600'
@@ -36,14 +30,27 @@
         >
           Products
         </a>
-        <a
-          href="/reports"
-          class="text-sm font-medium transition-colors {$page.url.pathname.startsWith('/reports')
-            ? 'text-blue-600'
-            : 'text-gray-500 hover:text-gray-900'}"
-        >
-          Reports
-        </a>
+
+        <!-- Admin nav links - authenticated only -->
+        {#if auth.isAuthenticated}
+          <a
+            href="/orders"
+            class="text-sm font-medium transition-colors {$page.url.pathname.startsWith('/orders')
+              ? 'text-blue-600'
+              : 'text-gray-500 hover:text-gray-900'}"
+          >
+            Orders
+          </a>
+          <a
+            href="/reports"
+            class="text-sm font-medium transition-colors {$page.url.pathname.startsWith('/reports')
+              ? 'text-blue-600'
+              : 'text-gray-500 hover:text-gray-900'}"
+          >
+            Reports
+          </a>
+        {/if}
+
         <a
           href="/scalar/v1"
           target="_blank"
@@ -56,6 +63,30 @@
           </svg>
         </a>
       </nav>
+
+      {#if auth.isAuthenticated && auth.user}
+        <div class="flex items-center gap-3">
+          <span class="text-sm text-gray-700">
+            {auth.user.displayName}
+            <span class="ml-1 inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+              {auth.user.role}
+            </span>
+          </span>
+          <button
+            onclick={() => auth.logout()}
+            class="rounded-md bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-200 transition-colors"
+          >
+            Sign out
+          </button>
+        </div>
+      {:else}
+        <a
+          href="/login"
+          class="rounded-md bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+        >
+          Sign in
+        </a>
+      {/if}
     </div>
   </div>
 </header>

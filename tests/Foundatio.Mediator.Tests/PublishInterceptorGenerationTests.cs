@@ -10,6 +10,8 @@ public class PublishInterceptorGenerationTests(ITestOutputHelper output) : Gener
             using System.Threading.Tasks;
             using Foundatio.Mediator;
 
+            [assembly: MediatorConfiguration(NotificationPublisher = NotificationPublisher.ForeachAwait)]
+
             public record MyEvent;
 
             public class MyEventHandler {
@@ -23,10 +25,7 @@ public class PublishInterceptorGenerationTests(ITestOutputHelper output) : Gener
             }
             """;
 
-        var options = CreateOptions(
-            ("build_property.MediatorNotificationPublisher", "ForeachAwait"));
-
-        var (_, diagnostics, trees) = RunGenerator(source, [new MediatorGenerator()], options);
+        var (_, diagnostics, trees) = RunGenerator(source, [new MediatorGenerator()]);
 
         Assert.Empty(diagnostics.Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error));
         var publishInterceptor = trees.FirstOrDefault(t => t.HintName == "_PublishInterceptors.g.cs");
@@ -50,6 +49,8 @@ public class PublishInterceptorGenerationTests(ITestOutputHelper output) : Gener
             using System.Threading.Tasks;
             using Foundatio.Mediator;
 
+            [assembly: MediatorConfiguration(NotificationPublisher = NotificationPublisher.TaskWhenAll)]
+
             public record UserRegistered(string UserId);
 
             public class UserRegisteredHandler {
@@ -63,10 +64,7 @@ public class PublishInterceptorGenerationTests(ITestOutputHelper output) : Gener
             }
             """;
 
-        var options = CreateOptions(
-            ("build_property.MediatorNotificationPublisher", "TaskWhenAll"));
-
-        var (_, diagnostics, trees) = RunGenerator(source, [new MediatorGenerator()], options);
+        var (_, diagnostics, trees) = RunGenerator(source, [new MediatorGenerator()]);
 
         Assert.Empty(diagnostics.Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error));
         var publishInterceptor = trees.FirstOrDefault(t => t.HintName == "_PublishInterceptors.g.cs");
@@ -88,6 +86,8 @@ public class PublishInterceptorGenerationTests(ITestOutputHelper output) : Gener
             using System.Threading.Tasks;
             using Foundatio.Mediator;
 
+            [assembly: MediatorConfiguration(NotificationPublisher = NotificationPublisher.FireAndForget)]
+
             public record ItemDeleted(string ItemId);
 
             public class ItemDeletedHandler {
@@ -101,10 +101,7 @@ public class PublishInterceptorGenerationTests(ITestOutputHelper output) : Gener
             }
             """;
 
-        var options = CreateOptions(
-            ("build_property.MediatorNotificationPublisher", "FireAndForget"));
-
-        var (_, diagnostics, trees) = RunGenerator(source, [new MediatorGenerator()], options);
+        var (_, diagnostics, trees) = RunGenerator(source, [new MediatorGenerator()]);
 
         Assert.Empty(diagnostics.Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error));
         var publishInterceptor = trees.FirstOrDefault(t => t.HintName == "_PublishInterceptors.g.cs");
@@ -140,7 +137,7 @@ public class PublishInterceptorGenerationTests(ITestOutputHelper output) : Gener
             }
             """;
 
-        // No MediatorNotificationPublisher property set - should default to ForeachAwait
+        // No NotificationPublisher attribute set - should default to ForeachAwait
         var (_, diagnostics, trees) = RunGenerator(source, [new MediatorGenerator()]);
 
         Assert.Empty(diagnostics.Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error));
@@ -161,6 +158,8 @@ public class PublishInterceptorGenerationTests(ITestOutputHelper output) : Gener
             using System.Threading.Tasks;
             using Foundatio.Mediator;
 
+            [assembly: MediatorConfiguration(DisableInterceptors = true)]
+
             public record TestEvent;
 
             public class TestHandler {
@@ -174,11 +173,7 @@ public class PublishInterceptorGenerationTests(ITestOutputHelper output) : Gener
             }
             """;
 
-        // MediatorDisableInterceptors set to true - disables all interceptors including publish
-        var options = CreateOptions(
-            ("build_property.MediatorDisableInterceptors", "true"));
-
-        var (_, diagnostics, trees) = RunGenerator(source, [new MediatorGenerator()], options);
+        var (_, diagnostics, trees) = RunGenerator(source, [new MediatorGenerator()]);
 
         Assert.Empty(diagnostics.Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error));
         var publishInterceptor = trees.FirstOrDefault(t => t.HintName == "_PublishInterceptors.g.cs");
@@ -193,6 +188,8 @@ public class PublishInterceptorGenerationTests(ITestOutputHelper output) : Gener
             using System.Threading;
             using System.Threading.Tasks;
             using Foundatio.Mediator;
+
+            [assembly: MediatorConfiguration(NotificationPublisher = NotificationPublisher.ForeachAwait)]
 
             public record OrderPlaced(string OrderId);
             public record InventoryReserved(string OrderId);
@@ -213,10 +210,7 @@ public class PublishInterceptorGenerationTests(ITestOutputHelper output) : Gener
             }
             """;
 
-        var options = CreateOptions(
-            ("build_property.MediatorNotificationPublisher", "ForeachAwait"));
-
-        var (_, diagnostics, trees) = RunGenerator(source, [new MediatorGenerator()], options);
+        var (_, diagnostics, trees) = RunGenerator(source, [new MediatorGenerator()]);
 
         Assert.Empty(diagnostics.Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error));
         var publishInterceptor = trees.FirstOrDefault(t => t.HintName == "_PublishInterceptors.g.cs");
@@ -233,6 +227,8 @@ public class PublishInterceptorGenerationTests(ITestOutputHelper output) : Gener
             using System.Threading.Tasks;
             using Foundatio.Mediator;
 
+            [assembly: MediatorConfiguration(NotificationPublisher = NotificationPublisher.ForeachAwait)]
+
             public record TestEvent;
 
             public class TestEventHandler {
@@ -246,10 +242,7 @@ public class PublishInterceptorGenerationTests(ITestOutputHelper output) : Gener
             }
             """;
 
-        var options = CreateOptions(
-            ("build_property.MediatorNotificationPublisher", "ForeachAwait"));
-
-        var (_, diagnostics, trees) = RunGenerator(source, [new MediatorGenerator()], options);
+        var (_, diagnostics, trees) = RunGenerator(source, [new MediatorGenerator()]);
 
         Assert.Empty(diagnostics.Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error));
         var publishInterceptor = trees.FirstOrDefault(t => t.HintName == "_PublishInterceptors.g.cs");
@@ -262,6 +255,8 @@ public class PublishInterceptorGenerationTests(ITestOutputHelper output) : Gener
     [Fact]
     public void InvalidPublisherValueFallsBackToDefault()
     {
+        // With enum-based configuration, invalid values are caught at compile time.
+        // This test verifies that the default (no attribute) produces ForeachAwait behavior.
         var source = """
             using System.Threading;
             using System.Threading.Tasks;
@@ -280,12 +275,9 @@ public class PublishInterceptorGenerationTests(ITestOutputHelper output) : Gener
             }
             """;
 
-        var options = CreateOptions(
-            ("build_property.MediatorNotificationPublisher", "InvalidValue"));
+        var (_, diagnostics, trees) = RunGenerator(source, [new MediatorGenerator()]);
 
-        var (_, diagnostics, trees) = RunGenerator(source, [new MediatorGenerator()], options);
-
-        // Invalid value falls back to default ForeachAwait
+        // Default configuration produces ForeachAwait behavior
         var publishInterceptor = trees.FirstOrDefault(t => t.HintName == "_PublishInterceptors.g.cs");
         Assert.NotNull(publishInterceptor.Source);
         // Uses runtime DI lookup with caching

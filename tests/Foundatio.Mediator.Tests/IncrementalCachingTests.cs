@@ -483,7 +483,7 @@ public class IncrementalCachingTests
     [Fact]
     public void ConfigurationChange_InterceptorsToggle_CausesRegeneration()
     {
-        var source = """
+        var sourceEnabled = """
             using System.Threading;
             using System.Threading.Tasks;
             using Foundatio.Mediator;
@@ -496,16 +496,29 @@ public class IncrementalCachingTests
             }
             """;
 
-        // First run with interceptors enabled
-        var options1 = CreateOptions(("build_property.MediatorDisableInterceptors", "false"));
-        var compilation = CreateCompilation(source);
-        var (driver1, _) = RunGenerator(compilation, options1);
+        var sourceDisabled = """
+            using System.Threading;
+            using System.Threading.Tasks;
+            using Foundatio.Mediator;
+
+            [assembly: MediatorConfiguration(DisableInterceptors = true)]
+
+            public record MyMessage;
+
+            public class MyHandler
+            {
+                public Task HandleAsync(MyMessage msg, CancellationToken ct) => Task.CompletedTask;
+            }
+            """;
+
+        // First run with interceptors enabled (default, no attribute)
+        var compilation = CreateCompilation(sourceEnabled);
+        var (driver1, _) = RunGenerator(compilation);
         var result1 = driver1.GetRunResult();
 
         // Second run with interceptors disabled - should NOT be fully cached
-        var options2 = CreateOptions(("build_property.MediatorDisableInterceptors", "true"));
-        var compilation2 = CreateCompilation(source);
-        var driver2 = CreateGeneratorDriver(options2);
+        var compilation2 = CreateCompilation(sourceDisabled);
+        var driver2 = CreateGeneratorDriver();
         driver2 = driver2.RunGenerators(compilation2, TestContext.Current.CancellationToken);
         var result2 = driver2.GetRunResult();
 
@@ -653,13 +666,12 @@ public class IncrementalCachingTests
 
     private static (GeneratorDriverRunResult Result1, GeneratorDriverRunResult Result2) RunGeneratorTwice(
         string source,
-        AnalyzerConfigOptionsProvider? optionsProvider = null,
         MetadataReference[]? additionalReferences = null)
     {
         var compilation = CreateCompilation(source, additionalReferences);
 
         // Create a driver with step tracking enabled
-        var driver = CreateGeneratorDriver(optionsProvider);
+        var driver = CreateGeneratorDriver();
 
         // Clone compilation for second run
         var clone = compilation.Clone();
@@ -676,15 +688,14 @@ public class IncrementalCachingTests
     }
 
     private static (GeneratorDriver Driver, GeneratorDriverRunResult Result) RunGenerator(
-        Compilation compilation,
-        AnalyzerConfigOptionsProvider? optionsProvider = null)
+        Compilation compilation)
     {
-        var driver = CreateGeneratorDriver(optionsProvider);
+        var driver = CreateGeneratorDriver();
         driver = driver.RunGenerators(compilation);
         return (driver, driver.GetRunResult());
     }
 
-    private static GeneratorDriver CreateGeneratorDriver(AnalyzerConfigOptionsProvider? optionsProvider = null)
+    private static GeneratorDriver CreateGeneratorDriver()
     {
         var generator = new MediatorGenerator().AsSourceGenerator();
 
@@ -699,7 +710,6 @@ public class IncrementalCachingTests
             [generator],
             additionalTexts: null,
             parseOptions: parseOptions,
-            optionsProvider: optionsProvider,
             driverOptions: opts);
     }
 
@@ -779,12 +789,6 @@ public class IncrementalCachingTests
 
         ms.Seek(0, SeekOrigin.Begin);
         return MetadataReference.CreateFromStream(ms);
-    }
-
-    private static AnalyzerConfigOptionsProvider CreateOptions(params (string Key, string Value)[] globalOptions)
-    {
-        var dict = globalOptions.ToImmutableDictionary(kv => kv.Key, kv => kv.Value);
-        return new SimpleOptionsProvider(dict);
     }
 
     #endregion
@@ -930,46 +934,6 @@ public class IncrementalCachingTests
                 {
                     // Some fields may not be readable, skip them
                 }
-            }
-        }
-    }
-
-    #endregion
-
-    #region Options Provider
-
-    private sealed class SimpleOptionsProvider : AnalyzerConfigOptionsProvider
-    {
-        private readonly ImmutableDictionary<string, string> _globals;
-
-        public SimpleOptionsProvider(ImmutableDictionary<string, string> globals)
-        {
-            _globals = globals;
-            GlobalOptions = new SimpleOptions(_globals);
-        }
-
-        public override AnalyzerConfigOptions GlobalOptions { get; }
-        public override AnalyzerConfigOptions GetOptions(SyntaxTree tree) => new SimpleOptions(_globals);
-        public override AnalyzerConfigOptions GetOptions(AdditionalText textFile) => new SimpleOptions(_globals);
-
-        private sealed class SimpleOptions : AnalyzerConfigOptions
-        {
-            private readonly ImmutableDictionary<string, string> _globals;
-
-            public SimpleOptions(ImmutableDictionary<string, string> globals)
-            {
-                _globals = globals;
-            }
-
-            public override bool TryGetValue(string key, out string value)
-            {
-                if (_globals.TryGetValue(key, out var v))
-                {
-                    value = v;
-                    return true;
-                }
-                value = string.Empty;
-                return false;
             }
         }
     }

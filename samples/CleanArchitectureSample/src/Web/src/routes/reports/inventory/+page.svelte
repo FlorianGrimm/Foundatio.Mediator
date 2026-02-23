@@ -1,6 +1,7 @@
 <script lang="ts">
   import { reportsApi } from '$lib/api';
   import { Card, Button, Spinner, Alert, Badge } from '$lib/components/ui';
+  import { AuthGuard } from '$lib/components/layout';
 
   let inventoryPromise = $state(reportsApi.inventory());
 
@@ -20,6 +21,7 @@
   <title>Inventory Report - Clean Architecture Sample</title>
 </svelte:head>
 
+<AuthGuard>
 <div class="space-y-6">
   <div class="flex justify-between items-center">
     <div>
@@ -115,3 +117,4 @@
     <Alert type="error" message={error.message || 'Failed to load inventory report'} />
   {/await}
 </div>
+</AuthGuard>

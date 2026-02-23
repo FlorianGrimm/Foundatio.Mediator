@@ -44,7 +44,7 @@ internal readonly record struct HandlerInfo
 
     /// <summary>
     /// The dependency injection lifetime for this handler.
-    /// When null, uses the project-level MediatorDefaultHandlerLifetime MSBuild property.
+    /// When null, uses the assembly-level MediatorConfiguration HandlerLifetime setting.
     /// </summary>
     public string? Lifetime { get; init; }
 

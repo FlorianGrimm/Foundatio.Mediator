@@ -1,7 +1,7 @@
 namespace Foundatio.Mediator.Tests;
 
 /// <summary>
-/// Tests for the MediatorEnableGenerationCounter MSBuild property feature.
+/// Tests for the MediatorConfiguration EnableGenerationCounter feature.
 /// When enabled, generated files include a generation counter comment to help diagnose
 /// when files are being regenerated during development.
 /// </summary>
@@ -32,8 +32,18 @@ public class GenerationCounterTests(ITestOutputHelper output) : GeneratorTestBas
     [Fact]
     public void GenerationCounter_Disabled_Explicitly_NoCounterInOutput()
     {
-        var opts = CreateOptions(("build_property.MediatorEnableGenerationCounter", "false"));
-        var (_, _, trees) = RunGenerator(HandlerSource, [new MediatorGenerator()], opts);
+        var src = """
+            using System.Threading;
+            using System.Threading.Tasks;
+            using Foundatio.Mediator;
+
+            [assembly: MediatorConfiguration(EnableGenerationCounter = false)]
+
+            public record Msg;
+            public class MsgHandler { public void Handle(Msg m) { } }
+            """;
+
+        var (_, _, trees) = RunGenerator(src, [new MediatorGenerator()]);
 
         var wrapper = trees.First(t => t.HintName.EndsWith("_Handler.g.cs"));
 
@@ -44,8 +54,18 @@ public class GenerationCounterTests(ITestOutputHelper output) : GeneratorTestBas
     [Fact]
     public void GenerationCounter_Enabled_CounterPresentInAllGeneratedFiles()
     {
-        var opts = CreateOptions(("build_property.MediatorEnableGenerationCounter", "true"));
-        var (_, _, trees) = RunGenerator(HandlerSource, [new MediatorGenerator()], opts);
+        var src = """
+            using System.Threading;
+            using System.Threading.Tasks;
+            using Foundatio.Mediator;
+
+            [assembly: MediatorConfiguration(EnableGenerationCounter = true)]
+
+            public record Msg;
+            public class MsgHandler { public void Handle(Msg m) { } }
+            """;
+
+        var (_, _, trees) = RunGenerator(src, [new MediatorGenerator()]);
 
         // All generated files should have the counter
         foreach (var tree in trees)
@@ -58,8 +78,18 @@ public class GenerationCounterTests(ITestOutputHelper output) : GeneratorTestBas
     [Fact]
     public void GenerationCounter_Enabled_EachFileHasCounter()
     {
-        var opts = CreateOptions(("build_property.MediatorEnableGenerationCounter", "true"));
-        var (_, _, trees) = RunGenerator(HandlerSource, [new MediatorGenerator()], opts);
+        var src = """
+            using System.Threading;
+            using System.Threading.Tasks;
+            using Foundatio.Mediator;
+
+            [assembly: MediatorConfiguration(EnableGenerationCounter = true)]
+
+            public record Msg;
+            public class MsgHandler { public void Handle(Msg m) { } }
+            """;
+
+        var (_, _, trees) = RunGenerator(src, [new MediatorGenerator()]);
 
         // With per-file counters, each file should have a generation counter
         foreach (var tree in trees)
@@ -77,15 +107,14 @@ public class GenerationCounterTests(ITestOutputHelper output) : GeneratorTestBas
             using System.Threading.Tasks;
             using Foundatio.Mediator;
 
+            [assembly: MediatorConfiguration(EnableGenerationCounter = true)]
+
             public record Msg;
             public class MsgHandler { public void Handle(Msg m) { } }
             public static class Calls { public static void C(IMediator m) { m.Invoke(new Msg()); } }
             """;
 
-        var opts = CreateOptions(
-            ("build_property.MediatorEnableGenerationCounter", "true"),
-            ("build_property.MediatorDisableInterceptors", "false"));
-        var (_, _, trees) = RunGenerator(source, [new MediatorGenerator()], opts);
+        var (_, _, trees) = RunGenerator(source, [new MediatorGenerator()]);
 
         // Verify we have multiple file types
         var handlerFile = trees.FirstOrDefault(t => t.HintName.EndsWith("_Handler.g.cs"));
@@ -112,8 +141,18 @@ public class GenerationCounterTests(ITestOutputHelper output) : GeneratorTestBas
     [Fact]
     public void GenerationCounter_Enabled_HeaderFormatIsCorrect()
     {
-        var opts = CreateOptions(("build_property.MediatorEnableGenerationCounter", "true"));
-        var (_, _, trees) = RunGenerator(HandlerSource, [new MediatorGenerator()], opts);
+        var src = """
+            using System.Threading;
+            using System.Threading.Tasks;
+            using Foundatio.Mediator;
+
+            [assembly: MediatorConfiguration(EnableGenerationCounter = true)]
+
+            public record Msg;
+            public class MsgHandler { public void Handle(Msg m) { } }
+            """;
+
+        var (_, _, trees) = RunGenerator(src, [new MediatorGenerator()]);
 
         var wrapper = trees.First(t => t.HintName.EndsWith("_Handler.g.cs"));
 

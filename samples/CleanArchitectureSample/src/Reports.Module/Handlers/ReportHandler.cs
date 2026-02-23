@@ -1,4 +1,5 @@
 using Foundatio.Mediator;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Logging;
 using Orders.Module.Messages;
 using Products.Module.Domain;
@@ -14,14 +15,15 @@ namespace Reports.Module.Handlers;
 /// - All data is fetched via published queries through the mediator
 /// - Loose coupling enables independent module evolution
 /// </summary>
-[HandlerCategory("Reports", RoutePrefix = "/api/reports")]
+[HandlerCategory("Reports")]
 public class ReportHandler(IMediator mediator, ILogger<ReportHandler> logger)
 {
     private const int LowStockThreshold = 10;
 
     /// <summary>
-    /// Generates a dashboard report combining data from Orders and Products modules
+    /// Generates a dashboard report combining data from Orders and Products modules (anonymous - public landing page)
     /// </summary>
+    [AllowAnonymous]
     public async Task<Result<DashboardReport>> HandleAsync(GetDashboardReport query, CancellationToken cancellationToken)
     {
         logger.LogInformation("Generating dashboard report");
@@ -131,8 +133,9 @@ public class ReportHandler(IMediator mediator, ILogger<ReportHandler> logger)
     }
 
     /// <summary>
-    /// Searches across both Orders and Products modules
+    /// Searches across both Orders and Products modules (anonymous - public search)
     /// </summary>
+    [AllowAnonymous]
     public async Task<Result<CatalogSearchResult>> HandleAsync(SearchCatalog query, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(query.SearchTerm))

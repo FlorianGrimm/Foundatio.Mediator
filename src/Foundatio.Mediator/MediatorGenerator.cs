@@ -9,80 +9,8 @@ public sealed class MediatorGenerator : IIncrementalGenerator
 {
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        var csharpSufficient = context.CompilationProvider
-            .Select((x, _) => x is CSharpCompilation { LanguageVersion: LanguageVersion.Default or >= LanguageVersion.CSharp11 });
-
-        var generatorConfiguration = context.AnalyzerConfigOptionsProvider
-            .Combine(csharpSufficient)
-            .Select((x, _) =>
-            {
-                var (options, isCSharpSufficient) = x;
-
-                // Read MediatorDisableInterceptors property
-                var interceptorsDisabled = options.GlobalOptions.TryGetValue($"build_property.{Constants.DisableInterceptorsPropertyName}", out string? disableSwitch)
-                    && disableSwitch.Equals("true", StringComparison.OrdinalIgnoreCase);
-                var interceptorsEnabled = !interceptorsDisabled && isCSharpSufficient;
-
-                // Read default handler lifetime property (None | Singleton | Scoped | Transient). Default: None
-                var defaultHandlerLifetime = "None";
-                if (options.GlobalOptions.TryGetValue($"build_property.{Constants.DefaultHandlerLifetimePropertyName}", out string? handlerLifetime) && !string.IsNullOrWhiteSpace(handlerLifetime))
-                    defaultHandlerLifetime = handlerLifetime.Trim();
-
-                // Read default middleware lifetime property (None | Singleton | Scoped | Transient). Default: None
-                var defaultMiddlewareLifetime = "None";
-                if (options.GlobalOptions.TryGetValue($"build_property.{Constants.DefaultMiddlewareLifetimePropertyName}", out string? middlewareLifetime) && !string.IsNullOrWhiteSpace(middlewareLifetime))
-                    defaultMiddlewareLifetime = middlewareLifetime.Trim();
-
-                // Read OpenTelemetry disabled property. Default: false (OpenTelemetry enabled by default)
-                var openTelemetryDisabled = options.GlobalOptions.TryGetValue($"build_property.{Constants.DisableOpenTelemetryPropertyName}", out string? openTelemetrySwitch)
-                    && openTelemetrySwitch.Equals("true", StringComparison.OrdinalIgnoreCase);
-                var openTelemetryEnabled = !openTelemetryDisabled;
-
-                // Read conventional discovery disabled property. Default: false (conventional discovery enabled by default)
-                var conventionalDiscoveryDisabled = options.GlobalOptions.TryGetValue($"build_property.{Constants.DisableConventionalDiscoveryPropertyName}", out string? conventionalDiscoverySwitch)
-                    && conventionalDiscoverySwitch.Equals("true", StringComparison.OrdinalIgnoreCase);
-
-                // Read generation counter enabled property. Default: false (disabled by default)
-                var generationCounterEnabled = options.GlobalOptions.TryGetValue($"build_property.{Constants.EnableGenerationCounterPropertyName}", out string? counterSwitch)
-                    && counterSwitch.Equals("true", StringComparison.OrdinalIgnoreCase);
-
-                // Read notification publisher property (ForeachAwait | TaskWhenAll | FireAndForget). Default: ForeachAwait
-                // Publish interceptors are controlled by InterceptorsEnabled - if disabled, no publish interceptors are generated
-                string notificationPublisher = "ForeachAwait"; // Default to ForeachAwait for sequential publish semantics
-                if (options.GlobalOptions.TryGetValue($"build_property.{Constants.NotificationPublisherPropertyName}", out string? publisherValue) && !string.IsNullOrWhiteSpace(publisherValue))
-                {
-                    var trimmed = publisherValue.Trim();
-                    if (trimmed.Equals("ForeachAwait", StringComparison.OrdinalIgnoreCase) ||
-                        trimmed.Equals("TaskWhenAll", StringComparison.OrdinalIgnoreCase) ||
-                        trimmed.Equals("FireAndForget", StringComparison.OrdinalIgnoreCase))
-                    {
-                        notificationPublisher = trimmed;
-                    }
-                }
-
-                // Read endpoint discovery mode (All | Explicit). Default: All
-                string endpointDiscoveryMode = "All";
-                if (options.GlobalOptions.TryGetValue($"build_property.{Constants.EndpointDiscoveryPropertyName}", out string? discoveryMode) && !string.IsNullOrWhiteSpace(discoveryMode))
-                {
-                    var trimmed = discoveryMode.Trim();
-                    if (trimmed.Equals("All", StringComparison.OrdinalIgnoreCase) ||
-                        trimmed.Equals("Explicit", StringComparison.OrdinalIgnoreCase))
-                    {
-                        endpointDiscoveryMode = trimmed;
-                    }
-                }
-
-                // Read endpoint require auth default. Default: false
-                var endpointRequireAuthDefault = options.GlobalOptions.TryGetValue($"build_property.{Constants.EndpointRequireAuthPropertyName}", out string? authSwitch)
-                    && authSwitch.Equals("true", StringComparison.OrdinalIgnoreCase);
-
-                // Read project name property for endpoint suffix. Default: null (uses assembly name)
-                string? projectName = null;
-                if (options.GlobalOptions.TryGetValue($"build_property.{Constants.ProjectNamePropertyName}", out string? projectNameValue) && !string.IsNullOrWhiteSpace(projectNameValue))
-                    projectName = projectNameValue.Trim();
-
-                return new GeneratorConfiguration(interceptorsEnabled, defaultHandlerLifetime, defaultMiddlewareLifetime, openTelemetryEnabled, conventionalDiscoveryDisabled, generationCounterEnabled, notificationPublisher, endpointDiscoveryMode, endpointRequireAuthDefault, projectName);
-            })
+        var generatorConfiguration = context.CompilationProvider
+            .Select(static (compilation, _) => GetConfiguration(compilation))
             .WithTrackingName(TrackingNames.Settings);
 
         var callSites = context.SyntaxProvider
@@ -124,6 +52,128 @@ public sealed class MediatorGenerator : IIncrementalGenerator
 
         context.RegisterImplementationSourceOutput(compilationAndData,
             static (spc, source) => Execute(source.Handlers, source.Middleware, source.CallSites, source.Configuration, source.Compilation, spc));
+    }
+
+    /// <summary>
+    /// Reads [assembly: MediatorConfiguration] and returns parsed generator configuration.
+    /// </summary>
+    private static GeneratorConfiguration GetConfiguration(Compilation compilation)
+    {
+        var isCSharpSufficient = compilation is CSharpCompilation { LanguageVersion: LanguageVersion.Default or >= LanguageVersion.CSharp11 };
+
+        var configAttr = compilation.Assembly.GetAttributes()
+            .FirstOrDefault(a => a.AttributeClass?.ToDisplayString() == WellKnownTypes.MediatorConfigurationAttribute);
+
+        // Defaults
+        bool disableInterceptors = false;
+        string handlerLifetime = "None";
+        string middlewareLifetime = "None";
+        bool disableOpenTelemetry = false;
+        bool conventionalDiscoveryDisabled = false;
+        bool generationCounterEnabled = false;
+        string notificationPublisher = "ForeachAwait";
+        string? projectName = null;
+
+        if (configAttr != null)
+        {
+            foreach (var arg in configAttr.NamedArguments)
+            {
+                switch (arg.Key)
+                {
+                    case "DisableInterceptors" when arg.Value.Value is bool b:
+                        disableInterceptors = b;
+                        break;
+                    case "HandlerLifetime" when arg.Value.Value is int v:
+                        handlerLifetime = v switch { 1 => "Transient", 2 => "Scoped", 3 => "Singleton", _ => "None" };
+                        break;
+                    case "MiddlewareLifetime" when arg.Value.Value is int v:
+                        middlewareLifetime = v switch { 1 => "Transient", 2 => "Scoped", 3 => "Singleton", _ => "None" };
+                        break;
+                    case "DisableOpenTelemetry" when arg.Value.Value is bool b:
+                        disableOpenTelemetry = b;
+                        break;
+                    case "HandlerDiscovery" when arg.Value.Value is int v:
+                        conventionalDiscoveryDisabled = v == 1; // Explicit = 1
+                        break;
+                    case "NotificationPublisher" when arg.Value.Value is int v:
+                        notificationPublisher = v switch { 1 => "TaskWhenAll", 2 => "FireAndForget", _ => "ForeachAwait" };
+                        break;
+                    case "ProjectName" when arg.Value.Value is string s:
+                        projectName = s;
+                        break;
+                    case "EnableGenerationCounter" when arg.Value.Value is bool b:
+                        generationCounterEnabled = b;
+                        break;
+                }
+            }
+        }
+
+        var interceptorsEnabled = !disableInterceptors && isCSharpSufficient;
+        var openTelemetryEnabled = !disableOpenTelemetry;
+
+        return new GeneratorConfiguration(interceptorsEnabled, handlerLifetime, middlewareLifetime,
+            openTelemetryEnabled, conventionalDiscoveryDisabled, generationCounterEnabled, notificationPublisher, projectName);
+    }
+
+    /// <summary>
+    /// Reads endpoint defaults from [assembly: MediatorConfiguration].
+    /// </summary>
+    private static EndpointDefaultsInfo GetEndpointDefaults(Compilation compilation)
+    {
+        var configAttr = compilation.Assembly.GetAttributes()
+            .FirstOrDefault(a => a.AttributeClass?.ToDisplayString() == WellKnownTypes.MediatorConfigurationAttribute);
+
+        if (configAttr == null)
+            return EndpointDefaultsInfo.Default;
+
+        string discovery = "None";
+        string? routePrefix = "/api";
+        var filters = Array.Empty<string>();
+        bool requireAuth = false;
+        string? policy = null;
+        var roles = Array.Empty<string>();
+
+        foreach (var arg in configAttr.NamedArguments)
+        {
+            switch (arg.Key)
+            {
+                case "EndpointDiscovery" when arg.Value.Value is int v:
+                    discovery = v switch { 1 => "Explicit", 2 => "All", _ => "None" };
+                    break;
+                case "EndpointRoutePrefix" when arg.Value.Value is string s:
+                    routePrefix = s;
+                    break;
+                case "EndpointFilters" when !arg.Value.IsNull && arg.Value.Kind == TypedConstantKind.Array:
+                    filters = arg.Value.Values
+                        .Where(v => v.Value is INamedTypeSymbol)
+                        .Select(v => ((INamedTypeSymbol)v.Value!).ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat))
+                        .ToArray();
+                    break;
+                case "EndpointRequireAuth" when arg.Value.Value is bool b:
+                    requireAuth = b;
+                    break;
+                case "EndpointPolicy" when arg.Value.Value is string s:
+                    policy = s;
+                    break;
+                case "EndpointRoles" when !arg.Value.IsNull && arg.Value.Kind == TypedConstantKind.Array:
+                    roles = arg.Value.Values
+                        .Where(v => v.Value is string)
+                        .Select(v => (string)v.Value!)
+                        .ToArray();
+                    break;
+            }
+        }
+
+        return new EndpointDefaultsInfo
+        {
+            Discovery = discovery,
+            RoutePrefix = routePrefix,
+            Filters = new(filters),
+            RequireAuth = requireAuth,
+            Policy = policy,
+            Roles = new(roles),
+            IsConfigured = true
+        };
     }
 
     private static void Execute(ImmutableArray<HandlerInfo> handlers, ImmutableArray<MiddlewareInfo> middleware, ImmutableArray<CallSiteInfo> callSites, GeneratorConfiguration configuration, Compilation compilation, SourceProductionContext context)
@@ -225,7 +275,8 @@ public sealed class MediatorGenerator : IIncrementalGenerator
 
         // Generate endpoint registration for all handlers (local + cross-assembly)
         // This must happen before the early return so WebApp can generate endpoints for handlers in referenced modules
-        EndpointGenerator.Execute(context, allHandlers, configuration, compilation);
+        var endpointDefaults = GetEndpointDefaults(compilation);
+        EndpointGenerator.Execute(context, allHandlers, endpointDefaults, configuration, compilation);
 
         if (handlersWithInfo.Count == 0)
         {

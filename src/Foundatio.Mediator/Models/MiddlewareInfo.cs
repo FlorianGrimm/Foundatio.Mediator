@@ -31,7 +31,7 @@ internal readonly record struct MiddlewareInfo
 
     /// <summary>
     /// The DI lifetime for this middleware when explicitly set via [Middleware(Lifetime = ...)] attribute.
-    /// Null means use the project-level MediatorDefaultMiddlewareLifetime setting.
+    /// Null means use the assembly-level MediatorConfiguration MiddlewareLifetime setting.
     /// </summary>
     public string? Lifetime { get; init; }
 

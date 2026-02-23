@@ -45,7 +45,7 @@ if (handler.RequiresDIResolutionPerInvocation)
 
 - `handler.Lifetime` is `"Scoped"`, OR
 - `handler.Lifetime` is `"Transient"`, OR
-- MSBuild property `MediatorDefaultHandlerLifetime` is `"Scoped"` or `"Transient"` AND `handler.Lifetime` is `None`
+- Assembly-level `MediatorConfiguration.HandlerLifetime` is `Scoped` or `Transient` AND `handler.Lifetime` is `None`
 
 ### 3. Explicit Singleton Lifetime
 

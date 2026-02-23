@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Common.Module;
 using Foundatio.Mediator;
 using Orders.Module.Domain;
 
@@ -16,13 +17,24 @@ public record CreateOrder(
 
     [Required(ErrorMessage = "Description is required")]
     [StringLength(200, MinimumLength = 5, ErrorMessage = "Description must be between 5 and 200 characters")]
-    string Description) : ICommand<Result<Order>>;
+    string Description) : ICommand<Result<Order>>, IHasRequestedBy
+{
+    /// <summary>
+    /// Populated automatically by the <see cref="Common.Module.Filters.SetRequestedByFilter"/>
+    /// endpoint filter from the HTTP context.
+    /// </summary>
+    public string? RequestedBy { get; set; }
+}
 
 public record UpdateOrder(
     [Required] string OrderId,
     decimal? Amount,
     string? Description,
-    OrderStatus? Status) : ICommand<Result<Order>>;
+    OrderStatus? Status) : ICommand<Result<Order>>, IHasRequestedBy
+{
+    /// <inheritdoc />
+    public string? RequestedBy { get; set; }
+}
 
 public record DeleteOrder([Required] string OrderId) : ICommand<Result>;
 

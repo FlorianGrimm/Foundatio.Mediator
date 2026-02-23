@@ -64,7 +64,6 @@ src/
 │   ├── InterceptsLocationGenerator.cs     # Emits [InterceptsLocation] attributes
 │   ├── EndpointGenerator.cs               # Generates minimal API endpoints
 │   ├── CrossAssemblyHandlerScanner.cs     # Scans referenced assemblies
-│   ├── Foundatio.Mediator.props           # MSBuild property definitions
 │   └── Models/                            # Data structures for analysis
 │
 └── Foundatio.Mediator.Abstractions/       # Runtime library
@@ -233,44 +232,33 @@ public HandlerResult Before(object message)
 }
 ```
 
-## MSBuild Configuration
+## Assembly Attribute Configuration
 
-Defined in `src/Foundatio.Mediator/Foundatio.Mediator.props`:
+All source generator configuration is done via a single `[assembly: MediatorConfiguration]` attribute:
 
-```xml
-<PropertyGroup>
-    <!-- Handler/Middleware lifetime: None, Transient, Scoped, Singleton -->
-    <MediatorDefaultHandlerLifetime>Scoped</MediatorDefaultHandlerLifetime>
-    <MediatorDefaultMiddlewareLifetime>Scoped</MediatorDefaultMiddlewareLifetime>
+```csharp
+using Foundatio.Mediator;
 
-    <!-- Disable C# interceptors (default: false) -->
-    <MediatorDisableInterceptors>false</MediatorDisableInterceptors>
-
-    <!-- Disable OpenTelemetry tracing (default: false) -->
-    <MediatorDisableOpenTelemetry>false</MediatorDisableOpenTelemetry>
-
-    <!-- Disable convention-based discovery (default: false) -->
-    <!-- When true, only IHandler interface or [Handler] attribute handlers are found -->
-    <MediatorDisableConventionalDiscovery>false</MediatorDisableConventionalDiscovery>
-
-    <!-- Endpoint generation: None, Explicit, All (default: None) -->
-    <MediatorEndpointDiscovery>None</MediatorEndpointDiscovery>
-
-    <!-- Require authentication for endpoints (default: false) -->
-    <MediatorEndpointRequireAuth>false</MediatorEndpointRequireAuth>
-
-    <!-- Custom suffix for generated endpoint methods (default: assembly name) -->
-    <MediatorProjectName>MyProject</MediatorProjectName>
-
-    <!-- Add generation timestamp comment (debug feature) -->
-    <MediatorEnableGenerationCounter>false</MediatorEnableGenerationCounter>
-</PropertyGroup>
+[assembly: MediatorConfiguration(
+    HandlerLifetime = MediatorLifetime.Scoped,         // Default handler DI lifetime
+    MiddlewareLifetime = MediatorLifetime.Scoped,      // Default middleware DI lifetime
+    DisableInterceptors = false,                        // Disable C# interceptors
+    DisableOpenTelemetry = false,                       // Disable OpenTelemetry tracing
+    HandlerDiscovery = HandlerDiscovery.All,            // All (convention + explicit) or Explicit only
+    NotificationPublisher = NotificationPublisher.ForeachAwait, // Sequential, TaskWhenAll, or FireAndForget
+    ProjectName = "MyProject",                          // Custom suffix for generated endpoint methods
+    EnableGenerationCounter = false,                    // Debug: add generation timestamp comment
+    EndpointDiscovery = EndpointDiscovery.All,          // None, Explicit, All
+    EndpointRoutePrefix = "/api",                       // Global route prefix for all endpoints (default: "/api")
+    EndpointRequireAuth = false,                        // Require auth for all endpoints
+    EndpointFilters = new[] { typeof(MyFilter) }        // Global endpoint filters
+)]
 ```
 
 **Lifetime behavior:**
 
 - `Scoped`/`Transient`/`Singleton`: Resolved from DI every invocation
-- `None` (default): Internally cached after first creation (best performance)
+- `Default` (default): Internally cached after first creation (best performance)
 
 ## Architecture Deep Dive
 

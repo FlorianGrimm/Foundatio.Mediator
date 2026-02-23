@@ -8,6 +8,4 @@ internal record GeneratorConfiguration(
     bool ConventionalDiscoveryDisabled,
     bool GenerationCounterEnabled,
     string NotificationPublisher,
-    string EndpointDiscoveryMode,
-    bool EndpointRequireAuthDefault,
     string? ProjectName);

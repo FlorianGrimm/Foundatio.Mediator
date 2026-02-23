@@ -74,9 +74,21 @@ internal readonly record struct EndpointInfo
     public bool GenerateEndpoint { get; init; }
 
     /// <summary>
+    /// Whether this handler has an explicit [HandlerEndpoint] attribute on the method or class.
+    /// Used by "Explicit" discovery mode to distinguish explicitly marked handlers.
+    /// </summary>
+    public bool HasExplicitEndpointAttribute { get; init; }
+
+    /// <summary>
     /// Whether this endpoint requires authentication.
     /// </summary>
     public bool RequireAuth { get; init; }
+
+    /// <summary>
+    /// Whether this endpoint allows anonymous access, overriding any group-level RequireAuthorization.
+    /// Set when the handler method or class has [AllowAnonymous].
+    /// </summary>
+    public bool AllowAnonymous { get; init; }
 
     /// <summary>
     /// Required roles for this endpoint (any of).
@@ -87,6 +99,25 @@ internal readonly record struct EndpointInfo
     /// Required authorization policies for this endpoint (all must be satisfied).
     /// </summary>
     public EquatableArray<string> Policies { get; init; }
+
+    /// <summary>
+    /// Endpoint filter type names (fully qualified) from [HandlerEndpoint] or class-level [HandlerEndpoint].
+    /// </summary>
+    public EquatableArray<string> Filters { get; init; }
+
+    /// <summary>
+    /// Category-level endpoint filter type names (fully qualified) from [HandlerCategory].
+    /// Kept separate so the generator can emit them on the MapGroup rather than individual endpoints.
+    /// </summary>
+    public EquatableArray<string> CategoryFilters { get; init; }
+
+    /// <summary>
+    /// The fully qualified type name of the inner value type for Produces metadata.
+    /// For Result&lt;T&gt; returns, this is the fully qualified name of T.
+    /// For non-Result non-void returns, this is the full return type name.
+    /// Null for void handlers or non-generic Result.
+    /// </summary>
+    public string? ProducesType { get; init; }
 }
 
 /// <summary>

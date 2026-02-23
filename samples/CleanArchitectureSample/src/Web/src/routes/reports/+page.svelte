@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Card, Button } from '$lib/components/ui';
+  import { AuthGuard } from '$lib/components/layout';
   import { BarChart3, Package, Search } from 'lucide-svelte';
 </script>
 
@@ -7,6 +8,7 @@
   <title>Reports - Clean Architecture Sample</title>
 </svelte:head>
 
+<AuthGuard>
 <div class="space-y-6">
   <div>
     <h1 class="text-2xl font-bold text-foreground">Reports</h1>
@@ -54,3 +56,4 @@
     </Card>
   </div>
 </div>
+</AuthGuard>

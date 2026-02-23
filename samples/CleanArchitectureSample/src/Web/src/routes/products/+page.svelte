@@ -5,6 +5,7 @@
   import { Button, Spinner, Alert } from '$lib/components/ui';
   import { toast } from '$lib/stores/toast.svelte';
   import { signalr } from '$lib/stores/signalr.svelte';
+  import { auth } from '$lib/stores/auth.svelte';
   import type { Product } from '$lib/types/product';
 
   let productsPromise = $state(productsApi.list());
@@ -59,7 +60,9 @@
     <h1 class="text-2xl font-bold text-gray-900">Products</h1>
     <div class="flex gap-2">
       <Button variant="secondary" onclick={refresh}>Refresh</Button>
-      <Button href="/products/new">New Product</Button>
+      {#if auth.isAuthenticated}
+        <Button href="/products/new">New Product</Button>
+      {/if}
     </div>
   </div>
 
@@ -69,7 +72,7 @@
     </div>
   {:then result}
     {#if result.data}
-      <ProductList products={result.data} ondelete={handleDelete} />
+      <ProductList products={result.data} ondelete={auth.isAuthenticated ? handleDelete : undefined} />
     {:else}
       <Alert type="error" message="Failed to load products" />
     {/if}

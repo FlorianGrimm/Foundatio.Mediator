@@ -557,6 +557,8 @@ public class CrossAssemblyHandlerTests(ITestOutputHelper output) : GeneratorTest
             using Foundatio.Mediator;
             using SharedHandlers;
 
+            [assembly: MediatorConfiguration(DisableInterceptors = true)]
+
             public class Consumer
             {
                 private readonly IMediator _mediator;
@@ -569,10 +571,7 @@ public class CrossAssemblyHandlerTests(ITestOutputHelper output) : GeneratorTest
             }
             """;
 
-        // Disable interceptors via MSBuild property
-        var options = CreateOptions(("build_property.MediatorDisableInterceptors", "true"));
-
-        var (_, _, trees) = RunGenerator(consumerSource, [new MediatorGenerator()], optionsProvider: options, additionalReferences: [handlerAssembly]);
+        var (_, _, trees) = RunGenerator(consumerSource, [new MediatorGenerator()], additionalReferences: [handlerAssembly]);
 
         // Should NOT generate cross-assembly interceptors when disabled
         var interceptors = trees.FirstOrDefault(t => t.HintName == "_CrossAssemblyInterceptors.g.cs");

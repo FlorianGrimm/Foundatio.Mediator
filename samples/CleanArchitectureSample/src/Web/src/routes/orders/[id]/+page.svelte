@@ -3,6 +3,7 @@
   import { goto } from '$app/navigation';
   import { ordersApi } from '$lib/api';
   import { OrderForm } from '$lib/components/orders';
+  import { AuthGuard } from '$lib/components/layout';
   import { Card, Spinner, Alert, Button } from '$lib/components/ui';
   import { toast } from '$lib/stores/toast.svelte';
   import type { UpdateOrderRequest } from '$lib/types/order';
@@ -45,6 +46,7 @@
   <title>Edit Order - Clean Architecture Sample</title>
 </svelte:head>
 
+<AuthGuard>
 <div class="max-w-2xl">
   {#await orderPromise}
     <div class="flex justify-center py-12">
@@ -76,3 +78,4 @@
     </div>
   {/await}
 </div>
+</AuthGuard>

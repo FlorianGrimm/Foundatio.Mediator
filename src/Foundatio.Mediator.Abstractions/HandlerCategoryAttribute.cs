@@ -50,4 +50,11 @@ public sealed class HandlerCategoryAttribute : Attribute
     /// Individual endpoints can override this setting using <see cref="HandlerEndpointAttribute.Policy"/>.
     /// </summary>
     public string? Policy { get; set; }
+
+    /// <summary>
+    /// Gets or sets the endpoint filter types for all endpoints in this category.
+    /// Each type must implement <c>Microsoft.AspNetCore.Http.IEndpointFilter</c>.
+    /// These filters are additive to any global-level filters and run before endpoint-level filters.
+    /// </summary>
+    public Type[]? Filters { get; set; }
 }
