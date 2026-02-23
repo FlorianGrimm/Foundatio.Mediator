@@ -169,6 +169,25 @@ When handlers return `Result<T>` or `Result`, the status is automatically mapped
 | `CriticalError` | 500 Internal Server Error |
 | `Unavailable` | 503 Service Unavailable |
 
+### File Downloads
+
+When a handler returns `Result<FileResult>`, the endpoint automatically uses `Results.File()` instead of `Results.Ok()`:
+
+```csharp
+public class ReportHandler
+{
+    [Endpoint(Method = "GET", Route = "/reports/{id}")]
+    public async Task<Result<FileResult>> HandleAsync(
+        GetReport query, IReportService reports, CancellationToken ct)
+    {
+        var stream = await reports.GeneratePdfAsync(query.Id, ct);
+        return Result.File(stream, "application/pdf", $"report-{query.Id}.pdf");
+    }
+}
+```
+
+The generated endpoint maps the `FileResult` to a file response with the correct content type and optional `Content-Disposition: attachment` header (when `FileName` is set).
+
 ## Customization Attributes
 
 ### `[HandlerCategory]`

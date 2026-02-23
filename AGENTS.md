@@ -153,6 +153,7 @@ Valid method names: `Handle`, `HandleAsync`, `Handles`, `HandlesAsync`, `Consume
 - `void`, `Task`, `ValueTask` (fire-and-forget)
 - `T`, `Task<T>`, `ValueTask<T>` (query/command response)
 - `Result<T>` (rich status handling)
+- `Result<FileResult>` (file download via `Result.File()`)
 - Tuple `(T, Event1, Event2)` (cascading messages)
 
 ```csharp

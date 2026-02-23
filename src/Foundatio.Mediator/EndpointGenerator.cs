@@ -584,6 +584,11 @@ internal static class EndpointGenerator
             source.AppendLine($"{awaitKeyword}global::Foundatio.Mediator.Generated.{wrapperClassName}.{handlerMethodName}(mediator, {messageVar}, cancellationToken);");
             source.AppendLine("return Microsoft.AspNetCore.Http.Results.Ok();");
         }
+        else if (handler.ReturnType.IsFileResult)
+        {
+            source.AppendLine($"var result = {awaitKeyword}global::Foundatio.Mediator.Generated.{wrapperClassName}.{handlerMethodName}(mediator, {messageVar}, cancellationToken);");
+            source.AppendLine($"return MediatorEndpointResultMapper_{assemblySuffix}.ToHttpResult(result);");
+        }
         else if (handler.ReturnType.IsResult)
         {
             source.AppendLine($"var result = {awaitKeyword}global::Foundatio.Mediator.Generated.{wrapperClassName}.{handlerMethodName}(mediator, {messageVar}, cancellationToken);");
@@ -617,9 +622,13 @@ internal static class EndpointGenerator
         source.AppendLine("""
             return result.Status switch
             {
-                Foundatio.Mediator.ResultStatus.Success => result.GetValue() is { } v
-                    ? Microsoft.AspNetCore.Http.Results.Ok(v)
-                    : Microsoft.AspNetCore.Http.Results.Ok(),
+                Foundatio.Mediator.ResultStatus.Success => result.GetValue() switch
+                {
+                    Foundatio.Mediator.FileResult file => Microsoft.AspNetCore.Http.Results.File(
+                        file.Stream, file.ContentType, file.FileName),
+                    { } v => Microsoft.AspNetCore.Http.Results.Ok(v),
+                    _ => Microsoft.AspNetCore.Http.Results.Ok()
+                },
                 Foundatio.Mediator.ResultStatus.Created => Microsoft.AspNetCore.Http.Results.Created(
                     result.Location ?? "", result.GetValue()),
                 Foundatio.Mediator.ResultStatus.NoContent => Microsoft.AspNetCore.Http.Results.NoContent(),

@@ -257,4 +257,30 @@ public sealed class Result : IResult
         Status = ResultStatus.Unavailable,
         Message = message
     };
+
+    /// <summary>
+    /// Creates a successful result containing a file stream.
+    /// </summary>
+    /// <param name="stream">The file content stream.</param>
+    /// <param name="contentType">The MIME content type (e.g. <c>"text/csv"</c>).</param>
+    /// <param name="fileName">Optional file name for download disposition.</param>
+    /// <returns>A <see cref="Result{T}"/> of <see cref="FileResult"/>.</returns>
+    public static Result<FileResult> File(Stream stream, string contentType, string? fileName = null) => new()
+    {
+        Status = ResultStatus.Success,
+        Value = new FileResult { Stream = stream, ContentType = contentType, FileName = fileName }
+    };
+
+    /// <summary>
+    /// Creates a successful result containing a file from a byte array.
+    /// </summary>
+    /// <param name="bytes">The file content.</param>
+    /// <param name="contentType">The MIME content type (e.g. <c>"application/pdf"</c>).</param>
+    /// <param name="fileName">Optional file name for download disposition.</param>
+    /// <returns>A <see cref="Result{T}"/> of <see cref="FileResult"/>.</returns>
+    public static Result<FileResult> File(byte[] bytes, string contentType, string? fileName = null) => new()
+    {
+        Status = ResultStatus.Success,
+        Value = new FileResult { Stream = new MemoryStream(bytes), ContentType = contentType, FileName = fileName }
+    };
 }

@@ -561,4 +561,36 @@ public class EndpointGenerationTests(ITestOutputHelper output) : GeneratorTestBa
         var anonCount = endpointSource!.Split(".AllowAnonymous()").Length - 1;
         Assert.Equal(1, anonCount);
     }
+
+    [Fact]
+    public void FileResultHandler_GeneratesFileEndpoint()
+    {
+        var source = """
+            using System.IO;
+            using Foundatio.Mediator;
+
+            [assembly: MediatorConfiguration(
+                EndpointRoutePrefix = "/api",
+                EndpointDiscovery = EndpointDiscovery.All
+            )]
+
+            public record ExportReport(int Id);
+
+            public class ReportHandler
+            {
+                public Result<FileResult> Handle(ExportReport query)
+                    => Result.File(new MemoryStream(), "text/csv", "report.csv");
+            }
+            """;
+
+        var refs = GetAspNetCoreReferences();
+        if (refs.Length == 0) return;
+
+        var (_, _, trees) = RunGenerator(source, [Gen], additionalReferences: refs);
+        var endpointSource = trees.FirstOrDefault(t => t.HintName == "_MediatorEndpoints.g.cs").Source;
+
+        Assert.NotNull(endpointSource);
+        // File results go through the result mapper which handles FileResult
+        Assert.Contains("ToHttpResult(result)", endpointSource);
+    }
 }

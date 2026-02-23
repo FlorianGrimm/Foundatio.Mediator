@@ -83,6 +83,31 @@ return Result.NoContent();
 return user; // Automatically becomes Result<User>.Success(user)
 ```
 
+### File Results
+
+For handlers that return file downloads:
+
+```csharp
+// From a stream
+return Result.File(fileStream, "application/pdf", "report.pdf");
+
+// From a byte array
+return Result.File(bytes, "image/png", "photo.png");
+
+// Inline (no download prompt) — omit the file name
+return Result.File(stream, "image/jpeg");
+```
+
+`Result.File()` returns a `Result<FileResult>`. The `FileResult` class carries:
+
+| Property | Type | Default | Description |
+| ------------- | ---------- | ----------------------------- | ----------------------------------------------------------------- |
+| `Stream` | `Stream` | `Stream.Null` | The file content |
+| `ContentType` | `string` | `"application/octet-stream"` | MIME type |
+| `FileName` | `string?` | `null` | When set, triggers a `Content-Disposition: attachment` header |
+
+When used with [generated endpoints](/guide/endpoints), `Result<FileResult>` is automatically mapped to `Results.File(stream, contentType, fileName)` instead of `Results.Ok()`.
+
 ### Error Results
 
 ```csharp

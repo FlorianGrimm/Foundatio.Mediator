@@ -35,6 +35,10 @@ internal readonly record struct TypeSymbolInfo
     /// </summary>
     public bool IsResult { get; init; }
     /// <summary>
+    /// Indicates if the type is a Result&lt;FileResult&gt;, used for file download endpoints.
+    /// </summary>
+    public bool IsFileResult { get; init; }
+    /// <summary>
     /// Indicates if the type is void or Task or ValueTask.
     /// </summary>
     public bool IsVoid { get; init; }
@@ -98,6 +102,7 @@ internal readonly record struct TypeSymbolInfo
             IsNullable = false,
             IsReferenceType = false,
             IsResult = false,
+            IsFileResult = false,
             IsVoid = true,
             IsTask = false,
             IsValueTask = false,
@@ -134,6 +139,7 @@ internal readonly record struct TypeSymbolInfo
         bool isObject = unwrappedType.IsObject(compilation);
         bool isInterface = unwrappedType.TypeKind == TypeKind.Interface;
         bool isResult = unwrappedNullableType.IsResult(compilation);
+        bool isFileResult = isResult && unwrappedNullableType.IsFileResult(compilation);
         bool isHandlerResult = unwrappedNullableType.IsHandlerResult(compilation);
         bool isCancellationToken = unwrappedNullableType.IsCancellationToken(compilation);
         bool isHandlerExecutionInfo = unwrappedNullableType.IsHandlerExecutionInfo(compilation);
@@ -178,6 +184,7 @@ internal readonly record struct TypeSymbolInfo
             IsNullable = isNullable,
             IsReferenceType = isReferenceType,
             IsResult = isResult,
+            IsFileResult = isFileResult,
             IsVoid = isVoid,
             IsTask = isTask,
             IsValueTask = isValueTask,

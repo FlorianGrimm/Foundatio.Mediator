@@ -80,6 +80,22 @@ internal static class TypeExtensions
         return false;
     }
 
+    internal static bool IsFileResult(this ITypeSymbol typeSymbol, Compilation compilation)
+    {
+        if (typeSymbol is not INamedTypeSymbol { IsGenericType: true } namedType)
+            return false;
+
+        var resultOfTType = compilation.GetTypeByMetadataName(WellKnownTypes.ResultOfT);
+        if (!SymbolEqualityComparer.Default.Equals(namedType.OriginalDefinition, resultOfTType))
+            return false;
+
+        var fileResultType = compilation.GetTypeByMetadataName(WellKnownTypes.FileResult);
+        if (fileResultType == null)
+            return false;
+
+        return SymbolEqualityComparer.Default.Equals(namedType.TypeArguments[0], fileResultType);
+    }
+
     internal static bool IsObject(this ITypeSymbol typeSymbol, Compilation compilation)
     {
         if (typeSymbol is INamedTypeSymbol namedType)
@@ -213,6 +229,7 @@ internal static class WellKnownTypes
     public const string ResultOfT = "Foundatio.Mediator.Result`1";
     public const string HandlerResult = "Foundatio.Mediator.HandlerResult";
     public const string GenericHandlerResult = "Foundatio.Mediator.HandlerResult`1";
+    public const string FileResult = "Foundatio.Mediator.FileResult";
     public const string IgnoreAttribute = "Foundatio.Mediator.FoundatioIgnoreAttribute";
     public const string HandlerAttribute = "Foundatio.Mediator.HandlerAttribute";
     public const string MiddlewareAttribute = "Foundatio.Mediator.MiddlewareAttribute";
