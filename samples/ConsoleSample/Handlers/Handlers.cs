@@ -62,6 +62,7 @@ public class OrderHandler
         return order; // Implicit conversion to Result<Order>
     }
 
+    [Retry(PolicyName = "aggressive")]
     public async Task<(Result<Order> Order, OrderUpdated? Event)> HandleAsync(UpdateOrder command)
     {
         _logger.LogInformation("Updating order {OrderId}", command.OrderId);

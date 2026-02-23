@@ -9,7 +9,12 @@ namespace ConsoleSample;
 /// </summary>
 /// <example>
 /// <code>
+/// // Inline settings
 /// [Retry(MaxAttempts = 5, DelayMs = 200)]
+/// public Result&lt;Order&gt; Handle(CreateOrder command) { ... }
+///
+/// // Named policy (from IResiliencePolicyProvider)
+/// [Retry(PolicyName = "aggressive")]
 /// public Result&lt;Order&gt; Handle(CreateOrder command) { ... }
 /// </code>
 /// </example>
@@ -17,6 +22,12 @@ namespace ConsoleSample;
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = false, Inherited = true)]
 public sealed class RetryAttribute : Attribute
 {
+    /// <summary>
+    /// Name of a pre-configured resilience policy to use from <c>IResiliencePolicyProvider</c>.
+    /// When set, all other properties on this attribute are ignored.
+    /// </summary>
+    public string? PolicyName { get; set; }
+
     /// <summary>
     /// Maximum number of retry attempts. Default is 3.
     /// </summary>
