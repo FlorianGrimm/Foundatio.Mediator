@@ -343,15 +343,14 @@ internal static class EndpointGenerator
         // Add metadata
         source.AppendLine($".WithName(\"{endpoint.Name}\")");
 
-        if (!string.IsNullOrEmpty(endpoint.Summary))
-        {
-            var escapedSummary = EscapeString(endpoint.Summary!);
-            source.AppendLine($".WithSummary(\"{escapedSummary}\")");
-        }
+        var messageName = handler.MessageType.Identifier;
+        source.AppendLine($".WithSummary(\"{messageName}\")");
 
-        if (!string.IsNullOrEmpty(endpoint.Description))
+        // Use explicit description if provided, otherwise fall back to the summary text (which includes XML doc)
+        var descriptionText = endpoint.Description ?? endpoint.Summary;
+        if (!string.IsNullOrEmpty(descriptionText))
         {
-            var escapedDescription = EscapeString(endpoint.Description!);
+            var escapedDescription = EscapeString(descriptionText!);
             source.AppendLine($".WithDescription(\"{escapedDescription}\")");
         }
 
