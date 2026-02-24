@@ -132,6 +132,7 @@ public sealed class MediatorGenerator : IIncrementalGenerator
         bool requireAuth = false;
         string? policy = null;
         var roles = Array.Empty<string>();
+        string summaryStyle = "Exact";
 
         foreach (var arg in configAttr.NamedArguments)
         {
@@ -161,6 +162,9 @@ public sealed class MediatorGenerator : IIncrementalGenerator
                         .Select(v => (string)v.Value!)
                         .ToArray();
                     break;
+                case "EndpointSummaryStyle" when arg.Value.Value is int v:
+                    summaryStyle = v switch { 1 => "Spaced", _ => "Exact" };
+                    break;
             }
         }
 
@@ -172,6 +176,7 @@ public sealed class MediatorGenerator : IIncrementalGenerator
             RequireAuth = requireAuth,
             Policy = policy,
             Roles = new(roles),
+            SummaryStyle = summaryStyle,
             IsConfigured = true
         };
     }

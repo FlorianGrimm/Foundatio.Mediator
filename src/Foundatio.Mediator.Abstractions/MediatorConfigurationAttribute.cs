@@ -119,4 +119,12 @@ public sealed class MediatorConfigurationAttribute : Attribute
     /// Default: <c>null</c> (no role requirement).
     /// </summary>
     public string[]? EndpointRoles { get; set; }
+
+    /// <summary>
+    /// Controls how the endpoint summary is generated from the message type name.
+    /// <see cref="EndpointSummaryStyle.Exact"/> uses the exact message type name (e.g., "GetProduct"),
+    /// <see cref="EndpointSummaryStyle.Spaced"/> splits PascalCase into words (e.g., "Get Product").
+    /// Default: <see cref="EndpointSummaryStyle.Exact"/>.
+    /// </summary>
+    public EndpointSummaryStyle EndpointSummaryStyle { get; set; }
 }

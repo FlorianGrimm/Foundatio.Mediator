@@ -252,7 +252,7 @@ internal static class EndpointGenerator
                 // Use the unique handler key that includes message type
                 var handlerKey = HandlerGenerator.GetHandlerClassName(handler);
                 routeOverrides.TryGetValue(handlerKey, out var routeOverride);
-                GenerateEndpoint(source, handler, groupVarName, hasAsParametersAttribute, hasFromBodyAttribute, hasWithOpenApi, categoryRequireAuth || endpointDefaults.RequireAuth, assemblySuffix, routeOverride);
+                GenerateEndpoint(source, handler, groupVarName, hasAsParametersAttribute, hasFromBodyAttribute, hasWithOpenApi, categoryRequireAuth || endpointDefaults.RequireAuth, assemblySuffix, endpointDefaults.SummaryStyle, routeOverride);
             }
         }
 
@@ -313,6 +313,7 @@ internal static class EndpointGenerator
         bool hasWithOpenApi,
         bool categoryRequireAuth,
         string assemblySuffix,
+        string summaryStyle,
         string? routeOverride = null)
     {
         var endpoint = handler.Endpoint!.Value;
@@ -343,7 +344,9 @@ internal static class EndpointGenerator
         // Add metadata
         source.AppendLine($".WithName(\"{endpoint.Name}\")");
 
-        var messageName = handler.MessageType.Identifier;
+        var messageName = summaryStyle == "Spaced"
+            ? SplitPascalCase(handler.MessageType.Identifier)
+            : handler.MessageType.Identifier;
         source.AppendLine($".WithSummary(\"{messageName}\")");
 
         // Use explicit description if provided, otherwise fall back to the summary text (which includes XML doc)
@@ -723,6 +726,45 @@ internal static class EndpointGenerator
             return value;
 
         return char.ToLowerInvariant(value[0]) + value.Substring(1);
+    }
+
+    /// <summary>
+    /// Splits a PascalCase identifier into space-separated words (e.g., "GetProduct" becomes "Get Product").
+    /// </summary>
+    private static string SplitPascalCase(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+            return value;
+
+        var sb = new StringBuilder(value.Length + 4);
+
+        for (int i = 0; i < value.Length; i++)
+        {
+            char c = value[i];
+
+            // Replace underscores with spaces
+            if (c == '_')
+            {
+                // Avoid double spaces or leading/trailing spaces
+                if (sb.Length > 0 && sb[sb.Length - 1] != ' ')
+                    sb.Append(' ');
+                continue;
+            }
+
+            if (i > 0 && char.IsUpper(c) && sb.Length > 0 && sb[sb.Length - 1] != ' ')
+            {
+                // Don't add space between consecutive uppercase (e.g., "IO" stays "IO")
+                bool prevIsUpper = char.IsUpper(value[i - 1]) || value[i - 1] == '_';
+                bool nextIsLower = i + 1 < value.Length && char.IsLower(value[i + 1]);
+
+                if (!prevIsUpper || nextIsLower)
+                    sb.Append(' ');
+            }
+
+            sb.Append(c);
+        }
+
+        return sb.ToString();
     }
 
     /// <summary>

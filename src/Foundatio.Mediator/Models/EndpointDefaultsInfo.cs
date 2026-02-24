@@ -38,6 +38,12 @@ internal readonly record struct EndpointDefaultsInfo
     public EquatableArray<string> Roles { get; init; }
 
     /// <summary>
+    /// Controls how the endpoint summary is generated from the message type name.
+    /// "Exact" uses the name as-is, "Spaced" splits PascalCase into words.
+    /// </summary>
+    public string SummaryStyle { get; init; }
+
+    /// <summary>
     /// Whether the [assembly: MediatorConfiguration] attribute was found.
     /// </summary>
     public bool IsConfigured { get; init; }
@@ -50,6 +56,7 @@ internal readonly record struct EndpointDefaultsInfo
         RequireAuth = false,
         Policy = null,
         Roles = EquatableArray<string>.Empty,
+        SummaryStyle = "Exact",
         IsConfigured = false
     };
 }
